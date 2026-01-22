@@ -2,18 +2,17 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install deps
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy source
 COPY . .
 
-# Cloud Run
+# DEBUG: print what files actually exist inside the image
+RUN echo "==== /app ====" && ls -la /app && \
+    echo "==== /app/src ====" && ls -la /app/src || true && \
+    echo "==== /app/src/routes ====" && ls -la /app/src/routes || true
+
 ENV PORT=8080
 EXPOSE 8080
-
-# Log node version (helps debugging)
-RUN node -v
 
 CMD ["node", "./src/server.js"]

@@ -22,6 +22,7 @@ const usersRoutes = require("./routes/users");
 const workHoursRoutes = require("./routes/workHours");
 const vacationsRoutes = require("./routes/vacations");
 const expensesRoutes = require("./routes/expenses");
+const exportRoutes = require("./routes/export");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api", usersRoutes);
 app.use("/api", workHoursRoutes);
 app.use("/api", vacationsRoutes);
 app.use("/api", expensesRoutes);
+app.use("/api", exportRoutes);
 
 const port = Number(process.env.PORT || 8080);
 

@@ -17,9 +17,9 @@ process.on("unhandledRejection", (reason) => {
 const express = require("express");
 const cors = require("cors");
 
-// Load routes
 const authRoutes = require("./routes/auth");
 const usersRoutes = require("./routes/users");
+const workHoursRoutes = require("./routes/workHours");
 
 const app = express();
 
@@ -32,6 +32,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api", authRoutes);
 app.use("/api", usersRoutes);
+app.use("/api", workHoursRoutes);
 
 const port = Number(process.env.PORT || 8080);
 

@@ -2,15 +2,18 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install deps first (better caching)
+# Install deps
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy app source
+# Copy source
 COPY . .
 
-# Cloud Run listens on $PORT
+# Cloud Run
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "src/server.js"]
+# Log node version (helps debugging)
+RUN node -v
+
+CMD ["node", "./src/server.js"]

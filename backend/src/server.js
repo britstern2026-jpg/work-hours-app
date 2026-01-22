@@ -20,6 +20,6 @@ app.use("/api", authRoutes);
 app.use("/api", usersRoutes);
 
 const port = process.env.PORT || 8080;
-app.listen(port, () => {
-  console.log(`Backend listening on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`✅ Server listening on port ${port}`);
 });

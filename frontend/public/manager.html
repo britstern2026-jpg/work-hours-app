@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Manager • Work Hours App</title>
+  <link rel="stylesheet" href="../src/css/main.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Work Hours App</div>
+    <div class="topbar-right">
+      <span id="whoami" class="muted"></span>
+      <button id="logoutBtn" class="btn btn-outline hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid">
+      <section class="card">
+        <h2>Users (includes passwords)</h2>
+        <div class="form inline">
+          <button id="mgrUsersLoad" class="btn btn-outline">Load users</button>
+        </div>
+
+        <div class="form">
+          <h3>Create new user</h3>
+          <div class="row">
+            <label>Username <input id="mgrNewUsername" type="text" /></label>
+            <label>Password <input id="mgrNewPassword" type="text" /></label>
+            <label>
+              Role
+              <select id="mgrNewRole">
+                <option value="employee">Employee</option>
+                <option value="manager">Manager</option>
+              </select>
+            </label>
+          </div>
+          <button id="mgrCreateUser" class="btn">Create user</button>
+          <div id="mgrUsersMsg" class="muted"></div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table" id="mgrUsersTable">
+            <thead><tr><th>Username</th><th>Role</th><th>Password</th><th>UID</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Manager edits</h2>
+        <div class="form">
+          <div class="row">
+            <label>User UID <input id="mgrTargetUid" type="text" /></label>
+            <label>Date <input id="mgrTargetDate" type="date" /></label>
+          </div>
+
+          <h3>Work hours</h3>
+          <div class="row">
+            <label>Start <input id="mgrWhStart" type="time" /></label>
+            <label>End <input id="mgrWhEnd" type="time" /></label>
+            <button id="mgrWhSave" class="btn">Save work hours</button>
+          </div>
+
+          <h3>Vacation</h3>
+          <div class="row">
+            <label>
+              Type
+              <select id="mgrVacType">
+                <option value="vacation">Vacation</option>
+                <option value="sick">Sick</option>
+                <option value="child_sick">Child sick</option>
+                <option value="reserve">Reserve</option>
+              </select>
+            </label>
+            <button id="mgrVacSet" class="btn">Set vacation</button>
+            <button id="mgrVacRemove" class="btn btn-outline">Remove vacation</button>
+          </div>
+
+          <div id="mgrEditMsg" class="muted"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Monthly report (Excel)</h2>
+        <div class="form inline">
+          <label>Month <input id="mgrExportMonth" type="month" /></label>
+          <button id="mgrExport" class="btn">Download XLSX</button>
+        </div>
+        <div id="mgrExportMsg" class="muted"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="../src/js/manager.js"></script>
+</body>
+</html>

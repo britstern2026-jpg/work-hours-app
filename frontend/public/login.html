@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login • Work Hours App</title>
+  <link rel="stylesheet" href="../src/css/main.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Work Hours App</div>
+    <div class="topbar-right">
+      <span id="whoami" class="muted"></span>
+      <button id="logoutBtn" class="btn btn-outline hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1>Login</h1>
+      <p class="muted">Enter your username and password.</p>
+
+      <div class="form">
+        <label>Username <input id="loginUsername" type="text" autocomplete="username" /></label>
+        <label>Password <input id="loginPassword" type="password" autocomplete="current-password" /></label>
+        <button id="loginBtn" class="btn">Login</button>
+        <div id="loginError" class="error hidden"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../src/js/login.js"></script>
+</body>
+</html>

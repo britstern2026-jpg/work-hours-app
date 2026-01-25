@@ -234,8 +234,8 @@ input:focus, select:focus{
 }
 
 .login-logo {
-  width: 220px;
-  height: 220px;
+  width: 500px;
+  height: 500px;
   border-radius: 50%;
   object-fit: cover;
 }

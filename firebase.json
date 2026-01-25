@@ -7,11 +7,7 @@
       "**/node_modules/**"
     ],
     "redirects": [
-      {
-        "source": "/",
-        "destination": "/public/login.html",
-        "type": 302
-      }
+      { "source": "/", "destination": "/login.html", "type": 302 }
     ]
   }
 }

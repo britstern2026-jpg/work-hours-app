@@ -205,6 +205,41 @@ input:focus, select:focus{
   background: rgba(199,163,78,.06);
 }
 
+/* ===== Brand / Logo ===== */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.brand-title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Bigger logo on login card */
+.login-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.login-logo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 /* Code */
 code{
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;

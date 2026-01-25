@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "work-hours-app-793b1"
-  }
+    "default": "work-hours-app-2"
+  },
+  "targets": {},
+  "etags": {}
 }

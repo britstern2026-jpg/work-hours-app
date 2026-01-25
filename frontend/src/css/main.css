@@ -233,11 +233,13 @@ input:focus, select:focus{
   margin-bottom: 14px;
 }
 
-.login-logo {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  object-fit: cover;
+.login-logo{
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 0 16px 0;
+  border-radius: 12px; /* optional, matches card rounding */
+  object-fit: contain;
 }
 
 /* Code */

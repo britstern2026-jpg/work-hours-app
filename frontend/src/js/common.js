@@ -10,13 +10,13 @@ export function initCommon({ requiredRole } = {}) {
     setHidden("logoutBtn", !token);
     qs("logoutBtn").addEventListener("click", () => {
       clearAuth();
-      window.location.href = "./login.html";
+      window.location.href = "./landing.html";
     });
   }
 
   // guard
   if (!token) {
-    window.location.href = "./login.html";
+    window.location.href = "./landing.html";
     return;
   }
   if (requiredRole && role !== requiredRole) {

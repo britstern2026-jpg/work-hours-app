@@ -12,7 +12,7 @@ async function login() {
   const password = qs("loginPassword").value;
 
   try {
-    const data = await apiFetch("/api/login", {
+    const data = await apiFetch("/api/welcome", {
       method: "POST",
       body: { username, password },
       auth: false,

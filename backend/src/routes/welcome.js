@@ -5,38 +5,42 @@ const { query } = require("../db");
 
 const router = express.Router();
 
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  const [type, token] = header.split(" ");
+  if (type !== "Bearer" || !token) return null;
+  return token;
+}
+
 function requireAuth(req, res, next) {
   try {
-    const header = req.headers.authorization || "";
-    const [type, token] = header.split(" ");
-    if (type !== "Bearer" || !token) {
-      return res.status(401).json({ error: "Missing Authorization Bearer token" });
-    }
+    const token = getBearerToken(req);
+    if (!token) return res.status(401).json({ error: "Missing Authorization Bearer token" });
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) return res.status(500).json({ error: "Server misconfigured: JWT_SECRET missing" });
-
-    const payload = jwt.verify(token, secret);
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = payload; // { uid, username, role, iat, exp }
+    return next();
+  } catch (e) {
+    return res.status(401).json({ error: "Invalid token" });
   }
 }
 
 function requireManager(req, res, next) {
-  if (!req.user) return res.status(500).json({ error: "Auth middleware not applied" });
-  if (req.user.role !== "manager") return res.status(403).json({ error: "Manager access required" });
-  next();
+  if (!req.user || req.user.role !== "manager") {
+    return res.status(403).json({ error: "Manager role required" });
+  }
+  return next();
 }
 
 // POST /api/welcome  (login)
 router.post("/welcome", async (req, res) => {
   try {
     const { username, password } = req.body || {};
-    if (!username || !password) return res.status(400).json({ error: "username and password are required" });
+    if (!username || !password) {
+      return res.status(400).json({ error: "username and password are required" });
+    }
 
-    const r = await query(
+    const result = await query(
       `SELECT id, username, password, role
        FROM users
        WHERE username = $1
@@ -44,17 +48,20 @@ router.post("/welcome", async (req, res) => {
       [username]
     );
 
-    if (r.rowCount === 0) return res.status(401).json({ error: "Invalid credentials" });
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
 
-    const user = r.rows[0];
-    if (user.password !== password) return res.status(401).json({ error: "Invalid credentials" });
+    const user = result.rows[0];
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) return res.status(500).json({ error: "Server misconfigured: JWT_SECRET missing" });
+    // NOTE: plaintext password (matches your current DB)
+    if (user.password !== password) {
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      secret,
+      { uid: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
@@ -65,4 +72,13 @@ router.post("/welcome", async (req, res) => {
   }
 });
 
-module.exports = { router, requireAuth, requireManager };
+// GET /api/me
+router.get("/me", requireAuth, (req, res) => {
+  return res.json({ user: req.user });
+});
+
+module.exports = router;
+
+// Export middlewares so other routes can reuse them
+module.exports.requireAuth = requireAuth;
+module.exports.requireManager = requireManager;

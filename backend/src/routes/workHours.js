@@ -1,185 +1,152 @@
+// backend/src/routes/workHours.js
 const express = require("express");
 const { DateTime } = require("luxon");
-const { db, admin } = require("../firebase");
-const { requireAuth, requireManager } = require("../auth");
+const { query } = require("../db");
+const { requireAuth, requireManager } = require("./welcome-wrapper");
 
 const router = express.Router();
-
-const APP_ZONE = "Asia/Jerusalem"; // business rule timezone
+const APP_ZONE = "Asia/Jerusalem";
 
 function isValidDateISO(dateStr) {
-  // expects YYYY-MM-DD
   const dt = DateTime.fromISO(dateStr, { zone: APP_ZONE });
   return dt.isValid && dt.toFormat("yyyy-MM-dd") === dateStr;
 }
 
-function isValidTimeHHmm(t) {
-  // expects HH:mm (24h)
-  if (typeof t !== "string") return false;
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(t);
-  return !!m;
+function isValidHHMM(t) {
+  return typeof t === "string" && /^\d{2}:\d{2}$/.test(t);
 }
 
-function timeToMinutes(t) {
-  const [hh, mm] = t.split(":").map(Number);
-  return hh * 60 + mm;
-}
-
-function todayStart() {
-  return DateTime.now().setZone(APP_ZONE).startOf("day");
-}
-
-function dateStart(dateStr) {
-  return DateTime.fromISO(dateStr, { zone: APP_ZONE }).startOf("day");
-}
-
-function monthRange(monthStr) {
-  // monthStr: YYYY-MM
-  const m = DateTime.fromFormat(monthStr, "yyyy-MM", { zone: APP_ZONE });
-  if (!m.isValid) return null;
-  const start = m.startOf("month");
-  const end = m.endOf("month");
-  return { start, end };
-}
-
-function docId(uid, dateStr) {
-  return `${uid}_${dateStr}`;
-}
-
-// POST /api/work-hours  (employee: own hours; no future dates)
+/**
+ * POST /api/work-hours
+ * Employee: create/update own work hours for a specific date
+ *
+ * Body supports:
+ *  - work_date (preferred)
+ *  - date      (alias)
+ */
 router.post("/work-hours", requireAuth, async (req, res) => {
   try {
-    const { date, startTime, endTime } = req.body || {};
+    const body = req.body || {};
+    const work_date = body.work_date || body.date; // accept alias
+    const { start_time, end_time } = body;
 
-    if (!date || !startTime || !endTime) {
-      return res.status(400).json({ error: "date, startTime, endTime are required" });
-    }
-    if (!isValidDateISO(date)) {
-      return res.status(400).json({ error: "date must be YYYY-MM-DD" });
-    }
-    if (!isValidTimeHHmm(startTime) || !isValidTimeHHmm(endTime)) {
-      return res.status(400).json({ error: "startTime/endTime must be HH:mm" });
+    if (!work_date || !start_time || !end_time) {
+      return res
+        .status(400)
+        .json({ error: "work_date (or date), start_time, end_time are required" });
     }
 
-    const startMin = timeToMinutes(startTime);
-    const endMin = timeToMinutes(endTime);
-    if (endMin <= startMin) {
-      return res.status(400).json({ error: "endTime must be after startTime" });
+    if (!isValidDateISO(work_date)) {
+      return res.status(400).json({ error: "work_date must be YYYY-MM-DD" });
     }
 
-    // Employee rule: cannot set future work hours (today OK)
-    const d = dateStart(date);
-    if (d > todayStart()) {
-      return res.status(403).json({ error: "Employees cannot edit future work hours" });
+    if (!isValidHHMM(start_time) || !isValidHHMM(end_time)) {
+      return res.status(400).json({ error: "start_time and end_time must be HH:MM" });
     }
 
-    const uid = req.user.uid;
-    const ref = db().collection("workHours").doc(docId(uid, date));
+    // IMPORTANT: your auth middleware provides req.user.uid (not req.user.id)
+    const userId = req.user?.uid;
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid token: missing uid" });
+    }
 
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    const durationMinutes = endMin - startMin;
-
-    await ref.set(
-      {
-        uid,
-        date,
-        startTime,
-        endTime,
-        durationMinutes,
-        updatedAt: now
-      },
-      { merge: true }
+    // Update-if-exists
+    const upd = await query(
+      `UPDATE work_hours
+       SET start_time = $1,
+           end_time   = $2
+       WHERE user_id = $3 AND work_date = $4
+       RETURNING
+         id,
+         user_id,
+         work_date::text AS work_date,
+         start_time::text AS start_time,
+         end_time::text AS end_time,
+         created_at`,
+      [start_time, end_time, userId, work_date]
     );
 
-    return res.json({ ok: true });
+    if (upd.rows.length > 0) {
+      return res.json({ ok: true, workHours: upd.rows[0], action: "updated" });
+    }
+
+    // Otherwise insert
+    const ins = await query(
+      `INSERT INTO work_hours (user_id, work_date, start_time, end_time)
+       VALUES ($1, $2, $3, $4)
+       RETURNING
+         id,
+         user_id,
+         work_date::text AS work_date,
+         start_time::text AS start_time,
+         end_time::text AS end_time,
+         created_at`,
+      [userId, work_date, start_time, end_time]
+    );
+
+    return res.json({ ok: true, workHours: ins.rows[0], action: "created" });
   } catch (err) {
-    console.error("work-hours employee upsert error:", err);
+    console.error("work-hours create/update error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
-// POST /api/work-hours/manager  (manager: any user/date; future allowed)
-router.post("/work-hours/manager", requireAuth, requireManager, async (req, res) => {
-  try {
-    const { userId, date, startTime, endTime } = req.body || {};
-
-    if (!userId || !date || !startTime || !endTime) {
-      return res.status(400).json({ error: "userId, date, startTime, endTime are required" });
-    }
-    if (!isValidDateISO(date)) {
-      return res.status(400).json({ error: "date must be YYYY-MM-DD" });
-    }
-    if (!isValidTimeHHmm(startTime) || !isValidTimeHHmm(endTime)) {
-      return res.status(400).json({ error: "startTime/endTime must be HH:mm" });
-    }
-
-    const startMin = timeToMinutes(startTime);
-    const endMin = timeToMinutes(endTime);
-    if (endMin <= startMin) {
-      return res.status(400).json({ error: "endTime must be after startTime" });
-    }
-
-    const ref = db().collection("workHours").doc(docId(userId, date));
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    const durationMinutes = endMin - startMin;
-
-    await ref.set(
-      {
-        uid: userId,
-        date,
-        startTime,
-        endTime,
-        durationMinutes,
-        updatedAt: now,
-        updatedBy: req.user.uid
-      },
-      { merge: true }
-    );
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("work-hours manager upsert error:", err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-
-// GET /api/work-hours?month=YYYY-MM[&userId=...]
+/**
+ * GET /api/work-hours
+ * Employee: list own work hours
+ */
 router.get("/work-hours", requireAuth, async (req, res) => {
   try {
-    const month = String(req.query.month || "");
-    const userId = req.query.userId ? String(req.query.userId) : null;
-
-    const range = monthRange(month);
-    if (!range) {
-      return res.status(400).json({ error: "month is required and must be YYYY-MM" });
+    const userId = req.user?.uid;
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid token: missing uid" });
     }
 
-    const { start, end } = range;
-    const startStr = start.toFormat("yyyy-MM-dd");
-    const endStr = end.toFormat("yyyy-MM-dd");
+    const r = await query(
+      `SELECT
+         id,
+         user_id,
+         work_date::text AS work_date,
+         start_time::text AS start_time,
+         end_time::text AS end_time,
+         created_at
+       FROM work_hours
+       WHERE user_id = $1
+       ORDER BY work_date DESC`,
+      [userId]
+    );
 
-    let uidToFetch = req.user.uid;
-
-    // manager can fetch any userId if provided
-    if (userId) {
-      if (req.user.role !== "manager") {
-        return res.status(403).json({ error: "Only managers can query other users" });
-      }
-      uidToFetch = userId;
-    }
-
-    const snap = await db()
-      .collection("workHours")
-      .where("uid", "==", uidToFetch)
-      .where("date", ">=", startStr)
-      .where("date", "<=", endStr)
-      .orderBy("date", "asc")
-      .get();
-
-    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return res.json({ uid: uidToFetch, month, items });
+    return res.json({ workHours: r.rows });
   } catch (err) {
-    console.error("work-hours get error:", err);
+    console.error("work-hours list error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /api/work-hours/all
+ * Manager: list everyone's work hours
+ */
+router.get("/work-hours/all", requireAuth, requireManager, async (req, res) => {
+  try {
+    const r = await query(
+      `SELECT
+         wh.id,
+         wh.user_id,
+         u.username,
+         wh.work_date::text AS work_date,
+         wh.start_time::text AS start_time,
+         wh.end_time::text AS end_time,
+         wh.created_at
+       FROM work_hours wh
+       JOIN users u ON u.id = wh.user_id
+       ORDER BY wh.work_date DESC, u.username ASC`,
+      []
+    );
+
+    return res.json({ workHours: r.rows });
+  } catch (err) {
+    console.error("work-hours all error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

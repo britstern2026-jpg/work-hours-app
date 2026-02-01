@@ -1,24 +1,71 @@
+// frontend/src/js/api.js
 import { CONFIG } from "./config.js";
-import { getAuth } from "./auth.js";
+import { getToken, clearAuth } from "./welcome.js";
 
-export async function apiFetch(path, { method="GET", body=null, auth=true } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  const { token } = getAuth();
-  if (auth && token) headers["Authorization"] = `Bearer ${token}`;
+function normalizeBase(url) {
+  return String(url || "").replace(/\/+$/, "");
+}
 
-  const res = await fetch(`${CONFIG.API_BASE}${path}`, {
+function buildUrl(path) {
+  const base = normalizeBase(CONFIG.API_BASE);
+  if (!path.startsWith("/")) path = `/${path}`;
+  return `${base}${path}`;
+}
+
+async function request(method, path, body) {
+  const url = buildUrl(path);
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : null,
+    body: body ? JSON.stringify(body) : undefined,
   });
 
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) {
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-    return json;
+  // If backend returns 401/403 — logout and go to login
+  if (res.status === 401 || res.status === 403) {
+    clearAuth();
+    // only redirect if we're in browser
+    if (typeof window !== "undefined") window.location.href = "/landing.html";
   }
+
   const text = await res.text();
-  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-  return text;
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg = data?.error || data?.message || `HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+
+  return data;
+}
+
+export function apiGet(path) {
+  return request("GET", path);
+}
+
+export function apiPost(path, body) {
+  return request("POST", path, body);
+}
+
+export function apiPut(path, body) {
+  return request("PUT", path, body);
+}
+
+export function apiDelete(path) {
+  return request("DELETE", path);
 }

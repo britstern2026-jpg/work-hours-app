@@ -1,121 +1,99 @@
-import { initCommon } from "./common.js";
-import { apiFetch } from "./api.js";
-import { getAuth } from "./auth.js";
-import { qs, setText } from "./ui.js";
-import { CONFIG } from "./config.js";
+// frontend/src/js/manager.js
+import { apiGet, apiPost } from "./api.js";
+import { requireRoleOrRedirect } from "./welcome.js";
+import { showMessage } from "./ui.js";
+import { logout } from "./common.js";
 
-function ymdToday() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function renderUsers(users) {
+  const el = document.getElementById("usersList");
+  if (!el) return;
+
+  if (!users?.length) {
+    el.innerHTML = "<div class='muted'>No users.</div>";
+    return;
+  }
+
+  el.innerHTML = users
+    .map((u) => {
+      return `<div class="row-item">
+        <div><b>#${u.id}</b> ${u.username} — <span class="pill">${u.role}</span></div>
+      </div>`;
+    })
+    .join("");
 }
-function ymThisMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+
+function renderAllWorkHours(rows, usersById) {
+  const el = document.getElementById("allWorkHoursList");
+  if (!el) return;
+
+  if (!rows?.length) {
+    el.innerHTML = "<div class='muted'>No work hours.</div>";
+    return;
+  }
+
+  el.innerHTML = rows
+    .map((r) => {
+      const user = usersById.get(r.user_id);
+      const username = user?.username || `user_id=${r.user_id}`;
+      const d = r.work_date || "";
+      const start = (r.start_time || "").slice(0, 5);
+      const end = (r.end_time || "").slice(0, 5);
+      const note = r.note ? ` • ${r.note}` : "";
+      return `<div class="row-item">
+        <div><b>${username}</b> — ${d} — ${start}-${end}${note}</div>
+      </div>`;
+    })
+    .join("");
 }
 
-async function boot() {
-  initCommon({ requiredRole: "manager" });
-  qs("mgrTargetDate").value = ymdToday();
-  qs("mgrExportMonth").value = ymThisMonth();
+async function refresh() {
+  const usersRes = await apiGet("/api/users");
+  const users = usersRes.users || [];
+  renderUsers(users);
 
-  // Users list
-  qs("mgrUsersLoad").addEventListener("click", async () => {
-    setText("mgrUsersMsg", "");
-    try {
-      const data = await apiFetch("/api/users");
-      qs("mgrUsersTable").querySelector("tbody").innerHTML = (data.users||[]).map(u => `
-        <tr>
-          <td>${u.username||""}</td>
-          <td>${u.role||""}</td>
-          <td>${u.password||""}</td>
-          <td><code>${u.uid||""}</code></td>
-        </tr>
-      `).join("");
-      setText("mgrUsersMsg", `Loaded ${(data.users||[]).length} users.`);
-    } catch (e) { setText("mgrUsersMsg", `Error: ${e.message}`); }
-  });
+  const usersById = new Map(users.map((u) => [u.id, u]));
 
-  // Create user
-  qs("mgrCreateUser").addEventListener("click", async () => {
-    setText("mgrUsersMsg", "");
-    try {
-      const username = qs("mgrNewUsername").value.trim();
-      const password = qs("mgrNewPassword").value;
-      const role = qs("mgrNewRole").value;
-      const r = await apiFetch("/api/users", { method:"POST", body:{ username, password, role } });
-      setText("mgrUsersMsg", `Created user (${r.uid}).`);
-    } catch (e) { setText("mgrUsersMsg", `Error: ${e.message}`); }
-  });
+  // Manager endpoint
+  const whRes = await apiGet("/api/work-hours/all");
+  renderAllWorkHours(whRes.workHours || [], usersById);
+}
 
-  // Work hours manager edit
-  qs("mgrWhSave").addEventListener("click", async () => {
-    setText("mgrEditMsg", "");
-    try {
-      await apiFetch("/api/work-hours/manager", {
-        method: "POST",
-        body: {
-          userId: qs("mgrTargetUid").value.trim(),
-          date: qs("mgrTargetDate").value,
-          startTime: qs("mgrWhStart").value,
-          endTime: qs("mgrWhEnd").value,
-        },
-      });
-      setText("mgrEditMsg", "Work hours saved.");
-    } catch (e) { setText("mgrEditMsg", `Error: ${e.message}`); }
-  });
+document.addEventListener("DOMContentLoaded", async () => {
+  const auth = requireRoleOrRedirect("manager");
+  if (!auth) return;
 
-  // Vacation manager set/remove
-  qs("mgrVacSet").addEventListener("click", async () => {
-    setText("mgrEditMsg", "");
-    try {
-      await apiFetch("/api/vacations/manager", {
-        method: "POST",
-        body: {
-          userId: qs("mgrTargetUid").value.trim(),
-          date: qs("mgrTargetDate").value,
-          type: qs("mgrVacType").value,
-        },
-      });
-      setText("mgrEditMsg", "Vacation set.");
-    } catch (e) { setText("mgrEditMsg", `Error: ${e.message}`); }
-  });
+  document.getElementById("logoutBtn")?.addEventListener("click", logout);
 
-  qs("mgrVacRemove").addEventListener("click", async () => {
-    setText("mgrEditMsg", "");
-    try {
-      const userId = qs("mgrTargetUid").value.trim();
-      const date = qs("mgrTargetDate").value;
-      await apiFetch(`/api/vacations/manager?userId=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}`, { method: "DELETE" });
-      setText("mgrEditMsg", "Vacation removed.");
-    } catch (e) { setText("mgrEditMsg", `Error: ${e.message}`); }
-  });
+  try {
+    await refresh();
+  } catch (e) {
+    showMessage(e.message || "Failed to load manager data", "error");
+  }
 
-  // Export download
-  qs("mgrExport").addEventListener("click", async () => {
-    setText("mgrExportMsg", "");
-    try {
-      const month = qs("mgrExportMonth").value;
-      const { token } = getAuth();
-      const url = `${CONFIG.API_BASE}/api/export?month=${encodeURIComponent(month)}`;
+  // Optional: create user form (if exists on page)
+  const form = document.getElementById("createUserForm");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showMessage("", "info");
 
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) {
-        const ct = res.headers.get("content-type") || "";
-        const msg = ct.includes("application/json") ? (await res.json()).error : await res.text();
-        throw new Error(msg || `HTTP ${res.status}`);
+      const username = document.getElementById("newUsername")?.value?.trim();
+      const password = document.getElementById("newPassword")?.value;
+      const role = document.getElementById("newRole")?.value;
+
+      if (!username || !password || !role) {
+        showMessage("username, password, role are required", "error");
+        return;
       }
 
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `report_${month}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setText("mgrExportMsg", "Downloaded.");
-    } catch (e) { setText("mgrExportMsg", `Error: ${e.message}`); }
-  });
-}
-
-boot();
+      try {
+        await apiPost("/api/users", { username, password, role });
+        showMessage("User created ✅", "success");
+        form.reset();
+        await refresh();
+      } catch (err) {
+        showMessage(err.message || "Failed to create user", "error");
+      }
+    });
+  }
+});

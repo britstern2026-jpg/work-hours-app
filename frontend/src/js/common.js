@@ -1,26 +1,21 @@
-import { getAuth, clearAuth } from "./auth.js";
-import { qs, setText, setHidden } from "./ui.js";
+// frontend/src/js/common.js
+import { clearAuth, getAuth } from "./welcome.js";
 
-export function initCommon({ requiredRole } = {}) {
-  const { token, role, username } = getAuth();
+export function logout() {
+  clearAuth();
+  window.location.href = "/landing.html";
+}
 
-  // header
-  if (qs("whoami")) setText("whoami", token ? `${username} (${role})` : "");
-  if (qs("logoutBtn")) {
-    setHidden("logoutBtn", !token);
-    qs("logoutBtn").addEventListener("click", () => {
-      clearAuth();
-      window.location.href = "./landing.html";
-    });
-  }
-
-  // guard
-  if (!token) {
-    window.location.href = "./landing.html";
+export function goHomeByRole() {
+  const a = getAuth();
+  if (!a?.role) {
+    window.location.href = "/landing.html";
     return;
   }
-  if (requiredRole && role !== requiredRole) {
-    // send employee to employee page, manager to manager page
-    window.location.href = role === "manager" ? "./manager.html" : "./employee.html";
-  }
+  window.location.href = a.role === "manager" ? "/manager.html" : "/employee.html";
+}
+
+export function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }

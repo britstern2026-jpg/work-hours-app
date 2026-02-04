@@ -1,87 +1,117 @@
 // frontend/src/js/manager.js
 import { apiGet, apiPost } from "./api.js";
-import { requireRoleOrRedirect } from "./welcome.js";
-import { logout } from "./common.js";
+import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
+import { showMessage } from "./ui.js";
 
-function msg(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text || "";
+function wireLogout() {
+  const btn = document.getElementById("logoutBtn");
+  if (!btn) return;
+
+  btn.classList.remove("hidden");
+  btn.disabled = false;
+
+  btn.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("✅ logout clicked (manager)");
+
+      clearAuth();
+      window.location.href = "landing.html";
+    },
+    true
+  );
 }
-
-/* ---------------- USERS ---------------- */
 
 function renderUsers(users) {
-  const tbody = document.querySelector("#mgrUsersTable tbody");
-  if (!tbody) return;
+  const el = document.getElementById("usersList");
+  if (!el) return;
 
-  tbody.innerHTML = "";
+  if (!users?.length) {
+    el.innerHTML = "<div class='muted'>No users.</div>";
+    return;
+  }
 
-  users.forEach((u) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${u.username}</td>
-      <td>${u.role}</td>
-      <td>${u.password || "(hidden)"}</td>
-      <td>${u.id}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  el.innerHTML = users
+    .map((u) => {
+      return `<div class="row-item">
+        <div><b>#${u.id}</b> ${u.username} — <span class="pill">${u.role}</span></div>
+      </div>`;
+    })
+    .join("");
 }
 
-async function loadUsers() {
-  msg("mgrUsersMsg", "Loading...");
-  const res = await apiGet("/api/users");
-  renderUsers(res.users || []);
-  msg("mgrUsersMsg", "");
+function renderAllWorkHours(rows, usersById) {
+  const el = document.getElementById("allWorkHoursList");
+  if (!el) return;
+
+  if (!rows?.length) {
+    el.innerHTML = "<div class='muted'>No work hours.</div>";
+    return;
+  }
+
+  el.innerHTML = rows
+    .map((r) => {
+      const user = usersById.get(r.user_id);
+      const username = user?.username || `user_id=${r.user_id}`;
+      const d = r.work_date || "";
+      const start = (r.start_time || "").slice(0, 5);
+      const end = (r.end_time || "").slice(0, 5);
+      const note = r.note ? ` • ${r.note}` : "";
+      return `<div class="row-item">
+        <div><b>${username}</b> — ${d} — ${start}-${end}${note}</div>
+      </div>`;
+    })
+    .join("");
 }
 
-/* ---------------- EXPORT ---------------- */
+async function refresh() {
+  const usersRes = await apiGet("/api/users");
+  const users = usersRes.users || [];
+  renderUsers(users);
 
-async function exportXlsx(month) {
-  msg("mgrExportMsg", "Preparing report...");
+  const usersById = new Map(users.map((u) => [u.id, u]));
 
-  const res = await apiGet(`/api/export?month=${month}`);
-
-  // backend should return URL or file download
-  msg("mgrExportMsg", "Export ready ✅");
+  const whRes = await apiGet("/api/work-hours/all");
+  renderAllWorkHours(whRes.workHours || [], usersById);
 }
-
-/* ---------------- MAIN ---------------- */
 
 document.addEventListener("DOMContentLoaded", async () => {
   const auth = requireRoleOrRedirect("manager");
   if (!auth) return;
 
-  document.getElementById("logoutBtn")?.classList.remove("hidden");
-  document.getElementById("logoutBtn")?.addEventListener("click", logout);
+  wireLogout();
 
-  // Load users button
-  document.getElementById("mgrUsersLoad")?.addEventListener("click", loadUsers);
+  try {
+    await refresh();
+  } catch (e) {
+    showMessage(e.message || "Failed to load manager data", "error");
+  }
 
-  // Create user button
-  document.getElementById("mgrCreateUser")?.addEventListener("click", async () => {
-    const username = document.getElementById("mgrNewUsername").value.trim();
-    const password = document.getElementById("mgrNewPassword").value;
-    const role = document.getElementById("mgrNewRole").value;
+  const form = document.getElementById("createUserForm");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showMessage("", "info");
 
-    if (!username || !password) {
-      msg("mgrUsersMsg", "Username + password required");
-      return;
-    }
+      const username = document.getElementById("newUsername")?.value?.trim();
+      const password = document.getElementById("newPassword")?.value;
+      const role = document.getElementById("newRole")?.value;
 
-    await apiPost("/api/users", { username, password, role });
-    msg("mgrUsersMsg", "User created ✅");
-    await loadUsers();
-  });
+      if (!username || !password || !role) {
+        showMessage("username, password, role are required", "error");
+        return;
+      }
 
-  // Export button
-  document.getElementById("mgrExport")?.addEventListener("click", async () => {
-    const month = document.getElementById("mgrExportMonth").value;
-    if (!month) {
-      msg("mgrExportMsg", "Choose a month");
-      return;
-    }
-
-    await exportXlsx(month);
-  });
+      try {
+        await apiPost("/api/users", { username, password, role });
+        showMessage("User created ✅", "success");
+        form.reset();
+        await refresh();
+      } catch (err) {
+        showMessage(err.message || "Failed to create user", "error");
+      }
+    });
+  }
 });

@@ -15,7 +15,14 @@
     </div>
     <div class="topbar-right">
       <span id="whoami" class="muted"></span>
-      <button id="logoutBtn" class="btn btn-outline hidden">Logout</button>
+      <button
+        id="logoutBtn"
+        class="btn btn-outline hidden"
+        style="position:relative; z-index:9999; pointer-events:auto;"
+        type="button"
+      >
+        Logout
+      </button>
     </div>
   </header>
 
@@ -27,12 +34,12 @@
           <label>Date <input id="empWhDate" type="date" /></label>
           <label>Start <input id="empWhStart" type="time" /></label>
           <label>End <input id="empWhEnd" type="time" /></label>
-          <button id="empWhSave" class="btn">Save</button>
+          <button id="empWhSave" class="btn" type="button">Save</button>
         </div>
 
         <div class="form inline">
           <label>Month <input id="empWhMonth" type="month" /></label>
-          <button id="empWhLoad" class="btn btn-outline">Load</button>
+          <button id="empWhLoad" class="btn btn-outline" type="button">Load</button>
         </div>
 
         <div id="empWhMsg" class="muted"></div>
@@ -57,13 +64,13 @@
               <option value="reserve">Military reserve duty</option>
             </select>
           </label>
-          <button id="empVacSave" class="btn">Set</button>
-          <button id="empVacDelete" class="btn btn-outline">Remove</button>
+          <button id="empVacSave" class="btn" type="button">Set</button>
+          <button id="empVacDelete" class="btn btn-outline" type="button">Remove</button>
         </div>
 
         <div class="form inline">
           <label>Month <input id="empVacMonth" type="month" /></label>
-          <button id="empVacLoad" class="btn btn-outline">Load</button>
+          <button id="empVacLoad" class="btn btn-outline" type="button">Load</button>
         </div>
 
         <div id="empVacMsg" class="muted"></div>
@@ -83,12 +90,12 @@
             <label>Amount <input id="empExpAmount" type="number" step="0.01" /></label>
           </div>
           <label>Description <input id="empExpDesc" type="text" /></label>
-          <button id="empExpAdd" class="btn">Add expense</button>
+          <button id="empExpAdd" class="btn" type="button">Add expense</button>
         </div>
 
         <div class="form inline">
           <label>Month <input id="empExpMonth" type="month" /></label>
-          <button id="empExpLoad" class="btn btn-outline">Load</button>
+          <button id="empExpLoad" class="btn btn-outline" type="button">Load</button>
         </div>
 
         <div id="empExpMsg" class="muted"></div>

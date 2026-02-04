@@ -15,7 +15,14 @@
     </div>
     <div class="topbar-right">
       <span id="whoami" class="muted"></span>
-      <button id="logoutBtn" class="btn btn-outline hidden">Logout</button>
+      <button
+        id="logoutBtn"
+        class="btn btn-outline hidden"
+        style="position:relative; z-index:9999; pointer-events:auto;"
+        type="button"
+      >
+        Logout
+      </button>
     </div>
   </header>
 
@@ -24,7 +31,7 @@
       <section class="card">
         <h2>Users (includes passwords)</h2>
         <div class="form inline">
-          <button id="mgrUsersLoad" class="btn btn-outline">Load users</button>
+          <button id="mgrUsersLoad" class="btn btn-outline" type="button">Load users</button>
         </div>
 
         <div class="form">
@@ -40,7 +47,7 @@
               </select>
             </label>
           </div>
-          <button id="mgrCreateUser" class="btn">Create user</button>
+          <button id="mgrCreateUser" class="btn" type="button">Create user</button>
           <div id="mgrUsersMsg" class="muted"></div>
         </div>
 
@@ -64,7 +71,7 @@
           <div class="row">
             <label>Start <input id="mgrWhStart" type="time" /></label>
             <label>End <input id="mgrWhEnd" type="time" /></label>
-            <button id="mgrWhSave" class="btn">Save work hours</button>
+            <button id="mgrWhSave" class="btn" type="button">Save work hours</button>
           </div>
 
           <h3>Vacation</h3>
@@ -78,8 +85,8 @@
                 <option value="reserve">Reserve</option>
               </select>
             </label>
-            <button id="mgrVacSet" class="btn">Set vacation</button>
-            <button id="mgrVacRemove" class="btn btn-outline">Remove vacation</button>
+            <button id="mgrVacSet" class="btn" type="button">Set vacation</button>
+            <button id="mgrVacRemove" class="btn btn-outline" type="button">Remove vacation</button>
           </div>
 
           <div id="mgrEditMsg" class="muted"></div>
@@ -90,7 +97,7 @@
         <h2>Monthly report (Excel)</h2>
         <div class="form inline">
           <label>Month <input id="mgrExportMonth" type="month" /></label>
-          <button id="mgrExport" class="btn">Download XLSX</button>
+          <button id="mgrExport" class="btn" type="button">Download XLSX</button>
         </div>
         <div id="mgrExportMsg" class="muted"></div>
       </section>

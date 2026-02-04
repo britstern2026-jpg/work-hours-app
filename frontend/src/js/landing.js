@@ -1,45 +1,70 @@
 // frontend/src/js/landing.js
 import { apiPost } from "./api.js";
 import { setAuth } from "./welcome.js";
-import { showMessage } from "./ui.js";
-import { CONFIG } from "./config.js";
+
+function showError(msg) {
+  const el = document.getElementById("loginError");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+function disableLogin(disabled) {
+  const btn = document.getElementById("loginBtn");
+  if (btn) btn.disabled = !!disabled;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Show version at bottom if element exists
-  const ver = document.getElementById("version");
-  if (ver) ver.textContent = `Version: ${CONFIG.APP_VERSION}`;
+  const btn = document.getElementById("loginBtn");
+  const userInput = document.getElementById("loginUsername");
+  const passInput = document.getElementById("loginPassword");
 
-  const form = document.getElementById("loginForm");
-  if (!form) return;
+  if (!btn || !userInput || !passInput) {
+    console.error("Login elements not found. Check landing.html IDs.");
+    return;
+  }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showMessage("", "info");
+  async function doLogin() {
+    showError("");
+    disableLogin(true);
 
-    const username = document.getElementById("username")?.value?.trim();
-    const password = document.getElementById("password")?.value;
+    const username = userInput.value.trim();
+    const password = passInput.value;
 
     if (!username || !password) {
-      showMessage("נא למלא שם משתמש וסיסמה", "error");
+      showError("Please enter username and password.");
+      disableLogin(false);
       return;
     }
 
     try {
-      // Your backend expects /api/welcome under the base URL
+      // Your backend route is POST /api/welcome
       const data = await apiPost("/api/welcome", { username, password });
 
-      // expected: { token, role, username }
+      // Save auth
       setAuth({
         token: data.token,
         role: data.role,
         username: data.username || username,
       });
 
-      // ✅ IMPORTANT: GitHub Pages needs relative navigation (NO leading "/")
+      // ✅ GitHub Pages project site: use relative paths (no leading "/")
       window.location.href =
         data.role === "manager" ? "manager.html" : "employee.html";
     } catch (err) {
-      showMessage(err.message || "Login failed", "error");
+      console.error(err);
+      showError(err?.message || "Login failed");
+      disableLogin(false);
     }
+  }
+
+  // Click login
+  btn.addEventListener("click", doLogin);
+
+  // Enter to login
+  [userInput, passInput].forEach((el) => {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLogin();
+    });
   });
 });

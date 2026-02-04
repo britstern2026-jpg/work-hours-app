@@ -2,6 +2,8 @@
 import { apiPost } from "./api.js";
 import { setAuth } from "./welcome.js";
 
+console.log("✅ landing.js loaded");
+
 function showError(msg) {
   const el = document.getElementById("loginError");
   if (!el) return;
@@ -20,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const passInput = document.getElementById("loginPassword");
 
   if (!btn || !userInput || !passInput) {
-    console.error("Login elements not found. Check landing.html IDs.");
+    console.error("❌ Login elements not found. Check landing.html IDs.");
     return;
   }
 
@@ -38,17 +40,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // Your backend route is POST /api/welcome
       const data = await apiPost("/api/welcome", { username, password });
 
-      // Save auth
       setAuth({
         token: data.token,
         role: data.role,
         username: data.username || username,
       });
 
-      // ✅ GitHub Pages project site: use relative paths (no leading "/")
+      // ✅ GitHub Pages project site: NO leading "/"
       window.location.href =
         data.role === "manager" ? "manager.html" : "employee.html";
     } catch (err) {
@@ -58,10 +58,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Click login
   btn.addEventListener("click", doLogin);
 
-  // Enter to login
   [userInput, passInput].forEach((el) => {
     el.addEventListener("keydown", (e) => {
       if (e.key === "Enter") doLogin();

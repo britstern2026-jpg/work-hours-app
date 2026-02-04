@@ -22,12 +22,11 @@ async function request(method, path, body) {
   const res = await fetch(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   if (res.status === 401 || res.status === 403) {
     clearAuth();
-    // ✅ GitHub Pages project site: relative redirect
     if (typeof window !== "undefined") window.location.href = "landing.html";
   }
 
@@ -53,4 +52,4 @@ async function request(method, path, body) {
 export const apiGet = (path) => request("GET", path);
 export const apiPost = (path, body) => request("POST", path, body);
 export const apiPut = (path, body) => request("PUT", path, body);
-export const apiDelete = (path) => request("DELETE", path);
+export const apiDelete = (path, body) => request("DELETE", path, body);

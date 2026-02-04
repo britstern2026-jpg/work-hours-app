@@ -1,92 +1,202 @@
 // frontend/src/js/employee.js
-import { apiGet, apiPost } from "./api.js";
+import { apiGet, apiPost, apiDelete } from "./api.js";
 import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
-import { showMessage } from "./ui.js";
+
+function msg(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text || "";
+}
 
 function wireLogout() {
   const btn = document.getElementById("logoutBtn");
   if (!btn) return;
-
   btn.classList.remove("hidden");
-  btn.disabled = false;
-
-  btn.addEventListener(
-    "click",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log("✅ logout clicked (employee)");
-
-      clearAuth();
-      window.location.href = "landing.html";
-    },
-    true // capture phase: even if something tries to intercept bubbling
-  );
+  btn.addEventListener("click", () => {
+    clearAuth();
+    window.location.href = "landing.html";
+  });
 }
+
+function monthPrefix(monthStr) {
+  // "YYYY-MM"
+  return String(monthStr || "").trim();
+}
+
+function filterByMonth(rows, fieldName, monthStr) {
+  const m = monthPrefix(monthStr);
+  if (!m) return rows || [];
+  return (rows || []).filter((r) => String(r[fieldName] || "").startsWith(m));
+}
+
+/* ------------ Work Hours ------------ */
+let cacheWorkHours = [];
 
 function renderWorkHours(rows) {
-  const list = document.getElementById("workHoursList");
-  if (!list) return;
+  const tbody = document.querySelector("#empWhTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
-  if (!rows?.length) {
-    list.innerHTML = "<div class='muted'>No work hours yet.</div>";
-    return;
-  }
-
-  list.innerHTML = rows
-    .map((r) => {
-      const d = r.work_date || r.workDate || "";
-      const start = (r.start_time || "").slice(0, 5);
-      const end = (r.end_time || "").slice(0, 5);
-      const note = r.note ? ` • ${r.note}` : "";
-      return `<div class="row-item">
-        <div><b>${d}</b> — ${start} - ${end}${note}</div>
-      </div>`;
-    })
-    .join("");
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.work_date}</td>
+      <td>${String(r.start_time || "").slice(0, 5)}</td>
+      <td>${String(r.end_time || "").slice(0, 5)}</td>
+      <td></td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-async function loadMyWorkHours() {
-  const data = await apiGet("/api/work-hours");
-  renderWorkHours(data.workHours || []);
+async function loadWorkHours() {
+  msg("empWhMsg", "Loading...");
+  const res = await apiGet("/api/work-hours");
+  cacheWorkHours = res.workHours || [];
+  renderWorkHours(cacheWorkHours);
+  msg("empWhMsg", "");
 }
 
+/* ------------ Vacations ------------ */
+let cacheVacations = [];
+
+function renderVacations(rows) {
+  const tbody = document.querySelector("#empVacTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  rows.forEach((v) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${v.vac_date}</td><td>${v.type}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadVacations() {
+  msg("empVacMsg", "Loading...");
+  const res = await apiGet("/api/vacations");
+  cacheVacations = res.vacations || [];
+  renderVacations(cacheVacations);
+  msg("empVacMsg", "");
+}
+
+/* ------------ Expenses ------------ */
+let cacheExpenses = [];
+
+function renderExpenses(rows) {
+  const tbody = document.querySelector("#empExpTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  rows.forEach((ex) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${ex.expense_date}</td><td>${ex.description}</td><td>${ex.amount}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadExpenses() {
+  msg("empExpMsg", "Loading...");
+  const res = await apiGet("/api/expenses");
+  cacheExpenses = res.expenses || [];
+  renderExpenses(cacheExpenses);
+  msg("empExpMsg", "");
+}
+
+/* ------------ Main ------------ */
 document.addEventListener("DOMContentLoaded", async () => {
   const auth = requireRoleOrRedirect("employee");
   if (!auth) return;
 
+  const who = document.getElementById("whoami");
+  if (who) who.textContent = `Logged in as ${auth.username}`;
+
   wireLogout();
 
-  try {
-    await loadMyWorkHours();
-  } catch (e) {
-    showMessage(e.message || "Failed to load work hours", "error");
-  }
+  await loadWorkHours();
+  await loadVacations();
+  await loadExpenses();
 
-  const form = document.getElementById("workHoursForm");
-  if (!form) return;
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showMessage("", "info");
-
-    const work_date = document.getElementById("workDate")?.value;
-    const start_time = document.getElementById("startTime")?.value;
-    const end_time = document.getElementById("endTime")?.value;
-    const note = document.getElementById("note")?.value?.trim();
+  // Save work hours
+  document.getElementById("empWhSave")?.addEventListener("click", async () => {
+    const work_date = document.getElementById("empWhDate")?.value;
+    const start_time = document.getElementById("empWhStart")?.value;
+    const end_time = document.getElementById("empWhEnd")?.value;
 
     if (!work_date || !start_time || !end_time) {
-      showMessage("work_date, start_time, end_time are required", "error");
+      msg("empWhMsg", "All fields required");
       return;
     }
 
-    try {
-      await apiPost("/api/work-hours", { work_date, start_time, end_time, note });
-      showMessage("Saved ✅", "success");
-      form.reset();
-      await loadMyWorkHours();
-    } catch (err) {
-      showMessage(err.message || "Failed to save", "error");
+    await apiPost("/api/work-hours", { work_date, start_time, end_time });
+    msg("empWhMsg", "Saved ✅");
+    await loadWorkHours();
+  });
+
+  // Load work hours by month (client filter)
+  document.getElementById("empWhLoad")?.addEventListener("click", () => {
+    const m = document.getElementById("empWhMonth")?.value;
+    const filtered = filterByMonth(cacheWorkHours, "work_date", m);
+    renderWorkHours(filtered);
+    msg("empWhMsg", m ? `Showing ${m}` : "");
+  });
+
+  // Save vacation
+  document.getElementById("empVacSave")?.addEventListener("click", async () => {
+    const vac_date = document.getElementById("empVacDate")?.value;
+    const type = document.getElementById("empVacType")?.value;
+
+    if (!vac_date || !type) {
+      msg("empVacMsg", "Date + type required");
+      return;
     }
+
+    await apiPost("/api/vacations", { vac_date, type });
+    msg("empVacMsg", "Vacation saved ✅");
+    await loadVacations();
+  });
+
+  // Delete vacation (own)
+  document.getElementById("empVacDelete")?.addEventListener("click", async () => {
+    const vac_date = document.getElementById("empVacDate")?.value;
+    if (!vac_date) {
+      msg("empVacMsg", "Choose a date to remove");
+      return;
+    }
+
+    await apiDelete("/api/vacations", { vac_date });
+    msg("empVacMsg", "Vacation removed ✅");
+    await loadVacations();
+  });
+
+  // Load vacations by month (client filter)
+  document.getElementById("empVacLoad")?.addEventListener("click", () => {
+    const m = document.getElementById("empVacMonth")?.value;
+    const filtered = filterByMonth(cacheVacations, "vac_date", m);
+    renderVacations(filtered);
+    msg("empVacMsg", m ? `Showing ${m}` : "");
+  });
+
+  // Add expense
+  document.getElementById("empExpAdd")?.addEventListener("click", async () => {
+    const expense_date = document.getElementById("empExpDate")?.value;
+    const amount = document.getElementById("empExpAmount")?.value;
+    const description = document.getElementById("empExpDesc")?.value?.trim();
+
+    if (!expense_date || !description || amount === "" || amount === null) {
+      msg("empExpMsg", "Date + amount + description required");
+      return;
+    }
+
+    await apiPost("/api/expenses", { expense_date, description, amount: Number(amount) });
+    msg("empExpMsg", "Expense saved ✅");
+    await loadExpenses();
+  });
+
+  // Load expenses by month (client filter)
+  document.getElementById("empExpLoad")?.addEventListener("click", () => {
+    const m = document.getElementById("empExpMonth")?.value;
+    const filtered = filterByMonth(cacheExpenses, "expense_date", m);
+    renderExpenses(filtered);
+    msg("empExpMsg", m ? `Showing ${m}` : "");
   });
 });

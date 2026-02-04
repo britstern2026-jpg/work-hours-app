@@ -1,5 +1,5 @@
 // frontend/src/js/manager.js
-import { apiGet, apiPost } from "./api.js";
+import { apiGet, apiPost, apiDelete } from "./api.js";
 import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
 
 function msg(id, text) {
@@ -10,10 +10,7 @@ function msg(id, text) {
 function wireLogout() {
   const btn = document.getElementById("logoutBtn");
   if (!btn) return;
-
   btn.classList.remove("hidden");
-  btn.disabled = false;
-
   btn.addEventListener("click", () => {
     clearAuth();
     window.location.href = "landing.html";
@@ -34,13 +31,9 @@ function getOrCreateTbody(tableId) {
 
 function renderUsers(users) {
   const tbody = getOrCreateTbody("mgrUsersTable");
-  if (!tbody) {
-    console.error("mgrUsersTable not found in DOM");
-    return;
-  }
+  if (!tbody) return;
 
   tbody.innerHTML = "";
-
   (users || []).forEach((u) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -72,21 +65,48 @@ async function createUser() {
 
   await apiPost("/api/users", { username, password, role });
   msg("mgrUsersMsg", "User created ✅");
-
-  // Optional: refresh list after creation (keep this or remove if you want manual refresh)
   await loadUsers();
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const auth = requireRoleOrRedirect("manager");
-  if (!auth) return;
+function readManagerTarget() {
+  const user_id = Number(document.getElementById("mgrTargetUid")?.value);
+  const date = document.getElementById("mgrTargetDate")?.value;
+  return { user_id, date };
+}
 
-  const who = document.getElementById("whoami");
-  if (who) who.textContent = `Logged in as ${auth.username}`;
+async function managerSaveWorkHours() {
+  const { user_id, date } = readManagerTarget();
+  const start_time = document.getElementById("mgrWhStart")?.value;
+  const end_time = document.getElementById("mgrWhEnd")?.value;
 
-  wireLogout();
+  if (!user_id || !date || !start_time || !end_time) {
+    msg("mgrEditMsg", "Need user UID + date + start + end");
+    return;
+  }
 
-  // Manual only:
-  document.getElementById("mgrUsersLoad")?.addEventListener("click", loadUsers);
-  document.getElementById("mgrCreateUser")?.addEventListener("click", createUser);
-});
+  const res = await apiPost("/api/work-hours/manager", {
+    user_id,
+    work_date: date,
+    start_time,
+    end_time,
+  });
+
+  msg("mgrEditMsg", `Work hours ${res.action || "saved"} ✅`);
+}
+
+async function managerSetVacation() {
+  const { user_id, date } = readManagerTarget();
+  const type = document.getElementById("mgrVacType")?.value;
+
+  if (!user_id || !date || !type) {
+    msg("mgrEditMsg", "Need user UID + date + type");
+    return;
+  }
+
+  const res = await apiPost("/api/vacations/manager", {
+    user_id,
+    vac_date: date,
+    type,
+  });
+
+  msg("mgrEditMsg", `Vacation ${res.action || "saved"} ✅`);

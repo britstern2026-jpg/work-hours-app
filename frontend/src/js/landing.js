@@ -25,7 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
+      // Your backend expects /api/welcome under the base URL
       const data = await apiPost("/api/welcome", { username, password });
+
       // expected: { token, role, username }
       setAuth({
         token: data.token,
@@ -33,8 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
         username: data.username || username,
       });
 
+      // ✅ IMPORTANT: GitHub Pages needs relative navigation (NO leading "/")
       window.location.href =
-        data.role === "manager" ? "/manager.html" : "/employee.html";
+        data.role === "manager" ? "manager.html" : "employee.html";
     } catch (err) {
       showMessage(err.message || "Login failed", "error");
     }

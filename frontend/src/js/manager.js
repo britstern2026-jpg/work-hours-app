@@ -43,14 +43,12 @@ function renderUsers(users) {
 
   (users || []).forEach((u) => {
     const tr = document.createElement("tr");
-
     tr.innerHTML = `
       <td>${u.username ?? ""}</td>
       <td>${u.role ?? ""}</td>
       <td>${u.password ?? ""}</td>
       <td>${u.id ?? ""}</td>
     `;
-
     tbody.appendChild(tr);
   });
 }
@@ -58,14 +56,10 @@ function renderUsers(users) {
 async function loadUsers() {
   msg("mgrUsersMsg", "Loading...");
   const res = await apiGet("/api/users");
-  console.log("✅ /api/users response:", res);
-
   renderUsers(res.users || []);
   msg("mgrUsersMsg", `Loaded ${res.users?.length || 0} users ✅`);
 }
 
-// Optional: manager edits wiring (your HTML has the controls)
-// If your backend supports these routes, we can hook them up next.
 async function createUser() {
   const username = document.getElementById("mgrNewUsername")?.value?.trim();
   const password = document.getElementById("mgrNewPassword")?.value;
@@ -78,6 +72,8 @@ async function createUser() {
 
   await apiPost("/api/users", { username, password, role });
   msg("mgrUsersMsg", "User created ✅");
+
+  // Optional: refresh list after creation (keep this or remove if you want manual refresh)
   await loadUsers();
 }
 
@@ -90,14 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
+  // Manual only:
   document.getElementById("mgrUsersLoad")?.addEventListener("click", loadUsers);
   document.getElementById("mgrCreateUser")?.addEventListener("click", createUser);
-
-  // Auto-load once when page opens (optional but nicer)
-  try {
-    await loadUsers();
-  } catch (e) {
-    console.error(e);
-    msg("mgrUsersMsg", e.message || "Failed to load users");
-  }
 });

@@ -31,10 +31,26 @@ export function getRole() {
   return getAuth()?.role || null;
 }
 
+/**
+ * IMPORTANT for GitHub Pages:
+ * Use relative navigation (NO leading "/") so it works under /work-hours-app/
+ */
+export function goToLanding() {
+  window.location.href = "landing.html";
+}
+
+export function goToEmployee() {
+  window.location.href = "employee.html";
+}
+
+export function goToManager() {
+  window.location.href = "manager.html";
+}
+
 export function requireLoggedInOrRedirect() {
   const a = getAuth();
   if (!a?.token) {
-    window.location.href = "/landing.html";
+    goToLanding();
     return null;
   }
   return a;
@@ -46,7 +62,8 @@ export function requireRoleOrRedirect(requiredRole) {
 
   if (a.role !== requiredRole) {
     // If role mismatch, send them somewhere sane:
-    window.location.href = a.role === "manager" ? "/manager.html" : "/employee.html";
+    if (a.role === "manager") goToManager();
+    else goToEmployee();
     return null;
   }
   return a;

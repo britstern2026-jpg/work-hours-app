@@ -19,13 +19,11 @@ function detectApiBase() {
     return "http://localhost:8080";
   }
 
-  // Production: set this to your Render backend URL
-  // Example: https://work-hours-backend.onrender.com
+  // Production: Render backend URL
   return "https://work-hours-backend-fx4l.onrender.com";
 }
 
 export const CONFIG = {
   API_BASE: detectApiBase(),
-  // Bump this string whenever you want to confirm a new deploy visually
-  APP_VERSION: "dev-2026-02-01-1",
+  APP_VERSION: "prod-2026-02-04-1",
 };

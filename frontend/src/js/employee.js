@@ -18,8 +18,7 @@ function wireLogout() {
 }
 
 function monthPrefix(monthStr) {
-  // "YYYY-MM"
-  return String(monthStr || "").trim();
+  return String(monthStr || "").trim(); // "YYYY-MM"
 }
 
 function filterByMonth(rows, fieldName, monthStr) {
@@ -36,7 +35,7 @@ function renderWorkHours(rows) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  rows.forEach((r) => {
+  (rows || []).forEach((r) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${r.work_date}</td>
@@ -64,7 +63,7 @@ function renderVacations(rows) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  rows.forEach((v) => {
+  (rows || []).forEach((v) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${v.vac_date}</td><td>${v.type}</td>`;
     tbody.appendChild(tr);
@@ -87,7 +86,7 @@ function renderExpenses(rows) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  rows.forEach((ex) => {
+  (rows || []).forEach((ex) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${ex.expense_date}</td><td>${ex.description}</td><td>${ex.amount}</td>`;
     tbody.appendChild(tr);
@@ -112,11 +111,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
-  await loadWorkHours();
-  await loadVacations();
-  await loadExpenses();
+  // ✅ NO auto-load here. User controls when to load.
 
-  // Save work hours
+  // Work hours: Save
   document.getElementById("empWhSave")?.addEventListener("click", async () => {
     const work_date = document.getElementById("empWhDate")?.value;
     const start_time = document.getElementById("empWhStart")?.value;
@@ -129,18 +126,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await apiPost("/api/work-hours", { work_date, start_time, end_time });
     msg("empWhMsg", "Saved ✅");
-    await loadWorkHours();
+    await loadWorkHours(); // refresh after save
   });
 
-  // Load work hours by month (client filter)
-  document.getElementById("empWhLoad")?.addEventListener("click", () => {
+  // Work hours: Load button (and month filter)
+  document.getElementById("empWhLoad")?.addEventListener("click", async () => {
+    await loadWorkHours();
     const m = document.getElementById("empWhMonth")?.value;
     const filtered = filterByMonth(cacheWorkHours, "work_date", m);
     renderWorkHours(filtered);
     msg("empWhMsg", m ? `Showing ${m}` : "");
   });
 
-  // Save vacation
+  // Vacation: Save
   document.getElementById("empVacSave")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     const type = document.getElementById("empVacType")?.value;
@@ -155,7 +153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadVacations();
   });
 
-  // Delete vacation (own)
+  // Vacation: Delete
   document.getElementById("empVacDelete")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     if (!vac_date) {
@@ -168,15 +166,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadVacations();
   });
 
-  // Load vacations by month (client filter)
-  document.getElementById("empVacLoad")?.addEventListener("click", () => {
+  // Vacations: Load (and month filter)
+  document.getElementById("empVacLoad")?.addEventListener("click", async () => {
+    await loadVacations();
     const m = document.getElementById("empVacMonth")?.value;
     const filtered = filterByMonth(cacheVacations, "vac_date", m);
     renderVacations(filtered);
     msg("empVacMsg", m ? `Showing ${m}` : "");
   });
 
-  // Add expense
+  // Expenses: Add
   document.getElementById("empExpAdd")?.addEventListener("click", async () => {
     const expense_date = document.getElementById("empExpDate")?.value;
     const amount = document.getElementById("empExpAmount")?.value;
@@ -192,8 +191,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadExpenses();
   });
 
-  // Load expenses by month (client filter)
-  document.getElementById("empExpLoad")?.addEventListener("click", () => {
+  // Expenses: Load (and month filter)
+  document.getElementById("empExpLoad")?.addEventListener("click", async () => {
+    await loadExpenses();
     const m = document.getElementById("empExpMonth")?.value;
     const filtered = filterByMonth(cacheExpenses, "expense_date", m);
     renderExpenses(filtered);

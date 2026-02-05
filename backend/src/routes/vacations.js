@@ -23,7 +23,27 @@ async function runWithDateColumn(sqlVacationDate, sqlVacDate, params) {
   }
 }
 
-// POST /api/vacations (employee own)
+/** Returns { exists: boolean, row?: any } */
+async function vacationExists(userId, date) {
+  const r = await runWithDateColumn(
+    `SELECT id, user_id, vacation_date, type, created_at
+     FROM vacations
+     WHERE user_id = $1 AND vacation_date = $2
+     ORDER BY id DESC
+     LIMIT 1`,
+    `SELECT id, user_id, vac_date, type, created_at
+     FROM vacations
+     WHERE user_id = $1 AND vac_date = $2
+     ORDER BY id DESC
+     LIMIT 1`,
+    [userId, date]
+  );
+
+  if (r.rows.length) return { exists: true, row: r.rows[0] };
+  return { exists: false };
+}
+
+// POST /api/vacations (employee own)  ✅ now: do NOT allow duplicate date
 router.post("/vacations", requireAuth, async (req, res) => {
   try {
     const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
@@ -35,19 +55,25 @@ router.post("/vacations", requireAuth, async (req, res) => {
 
     const userId = getUserId(req);
 
-    const r = await runWithDateColumn(
-      // vacation_date
+    const exists = await vacationExists(userId, date);
+    if (exists.exists) {
+      return res.status(409).json({
+        error: "Vacation already exists for this date",
+        existing: exists.row,
+      });
+    }
+
+    const inserted = await runWithDateColumn(
       `INSERT INTO vacations (user_id, vacation_date, type)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      // vac_date
       `INSERT INTO vacations (user_id, vac_date, type)
        VALUES ($1, $2, $3)
        RETURNING *`,
       [userId, date, type]
     );
 
-    return res.json({ ok: true, vacation: r.rows[0] });
+    return res.json({ ok: true, vacation: inserted.rows[0], action: "created" });
   } catch (err) {
     console.error("vacations create error:", err);
     return res.status(500).json({ error: "Server error", details: String(err.message || err) });
@@ -75,7 +101,7 @@ router.delete("/vacations", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/vacations/manager (manager set/replace)
+// POST /api/vacations/manager (manager set) ✅ now: do NOT allow duplicate date
 router.post("/vacations/manager", requireAuth, requireManager, async (req, res) => {
   try {
     const { user_id, type } = req.body || {};
@@ -85,25 +111,21 @@ router.post("/vacations/manager", requireAuth, requireManager, async (req, res) 
       return res.status(400).json({ error: "user_id, date (vacation_date/vac_date), type are required" });
     }
 
-    // Upsert by (user_id, date) without relying on DB constraint
-    const existing = await runWithDateColumn(
-      `SELECT id FROM vacations WHERE user_id = $1 AND vacation_date = $2 ORDER BY id DESC LIMIT 1`,
-      `SELECT id FROM vacations WHERE user_id = $1 AND vac_date = $2 ORDER BY id DESC LIMIT 1`,
-      [user_id, date]
-    );
-
-    if (existing.rows.length) {
-      const updated = await runWithDateColumn(
-        `UPDATE vacations SET type = $1 WHERE id = $2 RETURNING *`,
-        `UPDATE vacations SET type = $1 WHERE id = $2 RETURNING *`,
-        [type, existing.rows[0].id]
-      );
-      return res.json({ ok: true, vacation: updated.rows[0], action: "updated" });
+    const exists = await vacationExists(user_id, date);
+    if (exists.exists) {
+      return res.status(409).json({
+        error: "Vacation already exists for this date",
+        existing: exists.row,
+      });
     }
 
     const inserted = await runWithDateColumn(
-      `INSERT INTO vacations (user_id, vacation_date, type) VALUES ($1,$2,$3) RETURNING *`,
-      `INSERT INTO vacations (user_id, vac_date, type) VALUES ($1,$2,$3) RETURNING *`,
+      `INSERT INTO vacations (user_id, vacation_date, type)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      `INSERT INTO vacations (user_id, vac_date, type)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
       [user_id, date, type]
     );
 

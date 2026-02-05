@@ -21,10 +21,10 @@ function monthPrefix(monthStr) {
   return String(monthStr || "").trim(); // "YYYY-MM"
 }
 
-function filterByMonth(rows, fieldName, monthStr) {
+function filterByMonth(rows, getDateFn, monthStr) {
   const m = monthPrefix(monthStr);
   if (!m) return rows || [];
-  return (rows || []).filter((r) => String(r[fieldName] || "").startsWith(m));
+  return (rows || []).filter((r) => String(getDateFn(r) || "").startsWith(m));
 }
 
 /* ------------ Work Hours ------------ */
@@ -58,14 +58,19 @@ async function loadWorkHours() {
 /* ------------ Vacations ------------ */
 let cacheVacations = [];
 
+function getVacationDate(v) {
+  return v.vacation_date || v.vac_date || v.date;
+}
+
 function renderVacations(rows) {
   const tbody = document.querySelector("#empVacTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
   (rows || []).forEach((v) => {
+    const d = getVacationDate(v);
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${v.vac_date}</td><td>${v.type}</td>`;
+    tr.innerHTML = `<td>${d ?? ""}</td><td>${v.type ?? ""}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -111,8 +116,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
-  // ✅ NO auto-load here. User controls when to load.
-
   // Work hours: Save
   document.getElementById("empWhSave")?.addEventListener("click", async () => {
     const work_date = document.getElementById("empWhDate")?.value;
@@ -126,14 +129,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await apiPost("/api/work-hours", { work_date, start_time, end_time });
     msg("empWhMsg", "Saved ✅");
-    await loadWorkHours(); // refresh after save
+    await loadWorkHours();
   });
 
-  // Work hours: Load button (and month filter)
+  // Work hours: Load button + month filter
   document.getElementById("empWhLoad")?.addEventListener("click", async () => {
     await loadWorkHours();
     const m = document.getElementById("empWhMonth")?.value;
-    const filtered = filterByMonth(cacheWorkHours, "work_date", m);
+    const filtered = filterByMonth(cacheWorkHours, (r) => r.work_date, m);
     renderWorkHours(filtered);
     msg("empWhMsg", m ? `Showing ${m}` : "");
   });
@@ -148,6 +151,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    // backend accepts vac_date OR vacation_date; we send vac_date
     await apiPost("/api/vacations", { vac_date, type });
     msg("empVacMsg", "Vacation saved ✅");
     await loadVacations();
@@ -166,11 +170,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadVacations();
   });
 
-  // Vacations: Load (and month filter)
+  // Vacations: Load + month filter (supports vacation_date or vac_date)
   document.getElementById("empVacLoad")?.addEventListener("click", async () => {
     await loadVacations();
     const m = document.getElementById("empVacMonth")?.value;
-    const filtered = filterByMonth(cacheVacations, "vac_date", m);
+    const filtered = filterByMonth(cacheVacations, getVacationDate, m);
     renderVacations(filtered);
     msg("empVacMsg", m ? `Showing ${m}` : "");
   });
@@ -191,11 +195,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadExpenses();
   });
 
-  // Expenses: Load (and month filter)
+  // Expenses: Load + month filter
   document.getElementById("empExpLoad")?.addEventListener("click", async () => {
     await loadExpenses();
     const m = document.getElementById("empExpMonth")?.value;
-    const filtered = filterByMonth(cacheExpenses, "expense_date", m);
+    const filtered = filterByMonth(cacheExpenses, (r) => r.expense_date, m);
     renderExpenses(filtered);
     msg("empExpMsg", m ? `Showing ${m}` : "");
   });

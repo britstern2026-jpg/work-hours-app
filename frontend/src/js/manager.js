@@ -110,3 +110,4 @@ async function managerSetVacation() {
   });
 
   msg("mgrEditMsg", `Vacation ${res.action || "saved"} ✅`);
+}

@@ -7,11 +7,9 @@ const cors = require("cors");
 const welcomeRoutes = require("./routes/welcome");
 const usersRoutes = require("./routes/users");
 const workHoursRoutes = require("./routes/workHours");
-
-// If you have these wired to Postgres already, you can uncomment:
-// const vacationsRoutes = require("./routes/vacations");
-// const expensesRoutes = require("./routes/expenses");
-// const exportRoutes = require("./routes/export");
+const vacationsRoutes = require("./routes/vacations");
+const expensesRoutes = require("./routes/expenses");
+const exportRoutes = require("./routes/export");
 
 const app = express();
 
@@ -19,7 +17,7 @@ console.log("✅ server.js starting...");
 console.log("PORT =", process.env.PORT || 8080);
 console.log("NODE_ENV =", process.env.NODE_ENV);
 
-// --- Middleware: request timing logs ---
+// Request timing logs
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
@@ -29,7 +27,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- CORS (explicit) ---
+// CORS
 const allowedOrigins = [
   "https://britstern2026-jpg.github.io",
   "http://localhost:5500",
@@ -40,7 +38,6 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, cb) {
-    // allow curl/postman/server-to-server (no Origin header)
     if (!origin) return cb(null, true);
     if (allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin));
@@ -50,13 +47,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// ✅ Preflight handler — use regex, NOT "*" (fixes your Render crash)
+// IMPORTANT: regex, not "*"
 app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 
-// --- Health endpoints (no DB touch) ---
+// health
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, service: "work-hours-backend" });
 });
@@ -65,13 +61,13 @@ app.get("/", (req, res) => {
   res.status(200).json({ ok: true, hint: "Use /api/* endpoints" });
 });
 
-// ✅ IMPORTANT: mount all routers under /api
+// ✅ Mount all /api routes
 app.use("/api", welcomeRoutes);
 app.use("/api", usersRoutes);
 app.use("/api", workHoursRoutes);
-// app.use("/api", vacationsRoutes);
-// app.use("/api", expensesRoutes);
-// app.use("/api", exportRoutes);
+app.use("/api", vacationsRoutes);
+app.use("/api", expensesRoutes);
+app.use("/api", exportRoutes);
 
 // 404 JSON
 app.use((req, res) => {
@@ -85,6 +81,4 @@ app.use((err, req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 8080);
-// You can also bind explicitly, but not required:
-// app.listen(port, "0.0.0.0", () => ...)
 app.listen(port, () => console.log(`✅ Server listening on port ${port}`));

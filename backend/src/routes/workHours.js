@@ -9,12 +9,27 @@ function getUserId(req) {
   return req?.user?.id ?? req?.user?.uid ?? req?.user?.user_id ?? null;
 }
 
+async function resolveUserId(input) {
+  // If it's a number-like string, treat as id
+  if (input === undefined || input === null) return null;
+
+  const s = String(input).trim();
+  if (!s) return null;
+
+  // numeric id
+  if (/^\d+$/.test(s)) return Number(s);
+
+  // otherwise treat as username
+  const r = await query(`SELECT id FROM users WHERE username = $1 LIMIT 1`, [s]);
+  if (!r.rows.length) return null;
+  return r.rows[0].id;
+}
+
 // POST /api/work-hours  (employee adds own)
 router.post("/work-hours", requireAuth, async (req, res) => {
   try {
     const { work_date, start_time, end_time } = req.body || {};
 
-    // keep the error text exactly like you saw earlier
     if (!work_date || !start_time || !end_time) {
       return res.status(400).json({ error: "date, start_time, end_time are required" });
     }
@@ -38,16 +53,29 @@ router.post("/work-hours", requireAuth, async (req, res) => {
   }
 });
 
-// ✅ POST /api/work-hours/manager  (manager adds/updates for any user+date)
+// ✅ POST /api/work-hours/manager
+// Accepts either:
+// - user_id: number (existing behavior)
+// - OR username: string
+// - OR user_id field containing a username string (so UI can stay "User UID")
 router.post("/work-hours/manager", requireAuth, requireManager, async (req, res) => {
   try {
-    const { user_id, work_date, start_time, end_time } = req.body || {};
+    const { work_date, start_time, end_time } = req.body || {};
 
-    if (!user_id || !work_date || !start_time || !end_time) {
-      return res.status(400).json({ error: "user_id, work_date, start_time, end_time are required" });
+    // Keep compatibility: allow req.body.user_id OR req.body.username
+    const rawUser = req.body?.user_id ?? req.body?.username;
+
+    if (!rawUser || !work_date || !start_time || !end_time) {
+      return res
+        .status(400)
+        .json({ error: "user_id (or username), work_date, start_time, end_time are required" });
     }
 
-    // Upsert by (user_id, work_date) without requiring a DB constraint
+    const user_id = await resolveUserId(rawUser);
+    if (!user_id) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     const existing = await query(
       `SELECT id
        FROM work_hours
@@ -111,8 +139,7 @@ router.get("/work-hours/all", requireAuth, requireManager, async (req, res) => {
       `SELECT wh.id, wh.user_id, u.username, wh.work_date, wh.start_time, wh.end_time, wh.created_at
        FROM work_hours wh
        JOIN users u ON u.id = wh.user_id
-       ORDER BY wh.work_date DESC, wh.id DESC`,
-      []
+       ORDER BY wh.work_date DESC, wh.id DESC`
     );
 
     return res.json({ workHours: result.rows });

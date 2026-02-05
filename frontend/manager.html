@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Manager • Work Hours App</title>
+  <title>מנהל • אפליקציית שעות עבודה</title>
   <link rel="stylesheet" href="src/css/main.css" />
 </head>
 
 <body>
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="assets/logo.jpg" alt="logo" />
-      <span class="brand-title">Work Hours App</span>
+      <img class="brand-logo" src="assets/logo.jpg" alt="לוגו" />
+      <span class="brand-title">אפליקציית שעות עבודה</span>
     </div>
 
     <div class="topbar-right">
@@ -22,7 +22,7 @@
         type="button"
         style="position:relative; z-index:9999; pointer-events:auto;"
       >
-        Logout
+        התנתקות
       </button>
     </div>
   </header>
@@ -30,68 +30,67 @@
   <main class="container">
     <div class="grid">
       <section class="card">
-        <h2>Users (includes passwords)</h2>
+        <h2>משתמשים (כולל סיסמאות)</h2>
 
         <div class="form inline">
-          <button id="mgrUsersLoad" class="btn btn-outline" type="button">Load users</button>
+          <button id="mgrUsersLoad" class="btn btn-outline" type="button">טעינת משתמשים</button>
           <div id="mgrUsersMsg" class="muted"></div>
         </div>
 
         <div class="form">
-          <h3>Create new user</h3>
+          <h3>יצירת משתמש חדש</h3>
           <div class="row">
-            <label>Username <input id="mgrNewUsername" type="text" /></label>
-            <label>Password <input id="mgrNewPassword" type="text" /></label>
+            <label>שם משתמש <input id="mgrNewUsername" type="text" /></label>
+            <label>סיסמה <input id="mgrNewPassword" type="text" /></label>
             <label>
-              Role
+              תפקיד
               <select id="mgrNewRole">
-                <option value="employee">Employee</option>
-                <option value="manager">Manager</option>
+                <option value="employee">עובד</option>
+                <option value="manager">מנהל</option>
               </select>
             </label>
           </div>
-          <button id="mgrCreateUser" class="btn" type="button">Create user</button>
+          <button id="mgrCreateUser" class="btn" type="button">יצירת משתמש</button>
         </div>
 
         <div class="table-wrap">
           <table class="table" id="mgrUsersTable">
-            <thead><tr><th>Username</th><th>Role</th><th>Password</th><th>UID</th></tr></thead>
+            <thead><tr><th>שם משתמש</th><th>תפקיד</th><th>סיסמה</th><th>UID</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
       </section>
 
       <section class="card">
-        <h2>Manager edits</h2>
+        <h2>עריכת מנהל</h2>
 
         <div class="form">
           <div class="row">
-            <!-- ✅ UI change: Username instead of UID.
-                 NOTE: keeping id="mgrTargetUid" so existing JS works without extra HTML wiring. -->
-            <label>Username <input id="mgrTargetUid" type="text" placeholder="e.g. matti" autocomplete="username" /></label>
-            <label>Date <input id="mgrTargetDate" type="date" /></label>
+            <!-- ✅ משתמשים בשם משתמש, לא UID (שומרים את אותו id כדי לא לשבור JS אם עדיין משתמש בו) -->
+            <label>שם משתמש <input id="mgrTargetUid" type="text" placeholder="לדוגמה: matti" autocomplete="username" /></label>
+            <label>תאריך <input id="mgrTargetDate" type="date" /></label>
           </div>
 
-          <h3>Work hours</h3>
+          <h3>שעות עבודה</h3>
           <div class="row">
-            <label>Start <input id="mgrWhStart" type="time" /></label>
-            <label>End <input id="mgrWhEnd" type="time" /></label>
-            <button id="mgrWhSave" class="btn" type="button">Save work hours</button>
+            <label>התחלה <input id="mgrWhStart" type="time" /></label>
+            <label>סיום <input id="mgrWhEnd" type="time" /></label>
+            <button id="mgrWhSave" class="btn" type="button">שמירת שעות עבודה</button>
           </div>
 
-          <h3>Vacation</h3>
+          <h3>חופשה</h3>
           <div class="row">
             <label>
-              Type
+              סוג
               <select id="mgrVacType">
-                <option value="vacation">Vacation</option>
-                <option value="sick">Sick</option>
-                <option value="child_sick">Child sick</option>
-                <option value="reserve">Reserve</option>
+                <option value="vacation">חופשה</option>
+                <option value="sick">מחלה</option>
+                <option value="child_sick">מחלת ילד</option>
+                <option value="reserve">מילואים</option>
               </select>
             </label>
-            <button id="mgrVacSet" class="btn" type="button">Set vacation</button>
-            <button id="mgrVacRemove" class="btn btn-outline" type="button">Remove vacation</button>
+            <button id="mgrVacSet" class="btn" type="button">קביעת חופשה</button>
+            <button id="mgrVacRemove" class="btn btn-outline" type="button">הסרת חופשה</button>
           </div>
 
           <div id="mgrEditMsg" class="muted"></div>
@@ -99,10 +98,10 @@
       </section>
 
       <section class="card">
-        <h2>Monthly report (JSON download)</h2>
+        <h2>דו״ח חודשי (הורדת JSON)</h2>
         <div class="form inline">
-          <label>Month <input id="mgrExportMonth" type="month" /></label>
-          <button id="mgrExport" class="btn" type="button">Download JSON</button>
+          <label>חודש <input id="mgrExportMonth" type="month" /></label>
+          <button id="mgrExport" class="btn" type="button">הורדת JSON</button>
         </div>
         <div id="mgrExportMsg" class="muted"></div>
       </section>

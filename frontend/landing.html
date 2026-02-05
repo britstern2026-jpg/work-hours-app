@@ -1,32 +1,33 @@
 <!doctype html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login • Work Hours App</title>
+  <title>התחברות • אפליקציית שעות עבודה</title>
   <link rel="stylesheet" href="src/css/main.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Work Hours App</div>
+    <div class="brand">אפליקציית שעות עבודה</div>
     <div class="topbar-right">
       <span id="whoami" class="muted"></span>
-      <button id="logoutBtn" class="btn btn-outline hidden">Logout</button>
+      <button id="logoutBtn" class="btn btn-outline hidden">התנתקות</button>
     </div>
   </header>
 
   <main class="container">
     <section class="card">
       <div class="login-brand">
-        <img src="assets/logo1.jpg" class="login-logo" alt="Logo" />
+        <img src="assets/logo1.jpg" class="login-logo" alt="לוגו" />
       </div>
-      <h1>WELCOME</h1>
-      <p class="muted">Enter your username and password.</p>
+
+      <h1>ברוכים הבאים</h1>
+      <p class="muted">הכניסו שם משתמש וסיסמה כדי להתחבר.</p>
 
       <div class="form">
-        <label>Username <input id="loginUsername" type="text" autocomplete="username" /></label>
-        <label>Password <input id="loginPassword" type="password" autocomplete="current-password" /></label>
-        <button id="loginBtn" class="btn">Login</button>
+        <label>שם משתמש <input id="loginUsername" type="text" autocomplete="username" /></label>
+        <label>סיסמה <input id="loginPassword" type="password" autocomplete="current-password" /></label>
+        <button id="loginBtn" class="btn">התחברות</button>
         <div id="loginError" class="error hidden"></div>
       </div>
     </section>

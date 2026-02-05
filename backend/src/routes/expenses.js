@@ -5,9 +5,31 @@ const { requireAuth, requireManager } = require("./welcome");
 
 const router = express.Router();
 
-function getUserId(req) {
-  // support different auth payload shapes
-  return req?.user?.id ?? req?.user?.uid ?? req?.user?.user_id ?? null;
+/**
+ * DB schema (your actual DB):
+ *   expenses(username text NOT NULL, expense_date date, amount numeric, description text, created_at)
+ *   FK: expenses.username -> users.username
+ *
+ * So we use username everywhere.
+ * For safety, if someone sends user_id (legacy), we try to resolve id -> username.
+ */
+
+function getUsernameFromToken(req) {
+  return req?.user?.username ?? null;
+}
+
+async function resolveUsernameFromBody(body) {
+  const username = body?.username?.trim();
+  if (username) return username;
+
+  const user_id = body?.user_id ?? body?.uid ?? body?.id;
+  if (user_id === undefined || user_id === null || user_id === "") return null;
+
+  const n = Number(user_id);
+  if (!Number.isFinite(n)) return null;
+
+  const r = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1`, [n]);
+  return r.rows[0]?.username ?? null;
 }
 
 // POST /api/expenses (employee: own)
@@ -22,17 +44,16 @@ router.post("/expenses", requireAuth, async (req, res) => {
         .json({ error: "expense_date (or date), description, amount are required" });
     }
 
-    const userId = getUserId(req);
-    if (!userId) {
-      // This would indicate your JWT middleware didn't attach the user id
-      return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    const username = getUsernameFromToken(req);
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
     }
 
     const { rows } = await query(
-      `INSERT INTO expenses (user_id, expense_date, description, amount)
+      `INSERT INTO expenses (username, expense_date, description, amount)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [userId, expense_date, String(description), Number(amount)]
+      [username, expense_date, String(description), Number(amount)]
     );
 
     return res.json({ ok: true, expense: rows[0] });
@@ -45,15 +66,15 @@ router.post("/expenses", requireAuth, async (req, res) => {
 // GET /api/expenses (employee: own)
 router.get("/expenses", requireAuth, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    const username = getUsernameFromToken(req);
+    if (!username) return res.status(401).json({ error: "Unauthorized (missing username in token)" });
 
     const { rows } = await query(
       `SELECT *
        FROM expenses
-       WHERE user_id = $1
+       WHERE username = $1
        ORDER BY expense_date DESC, id DESC`,
-      [userId]
+      [username]
     );
 
     return res.json({ expenses: rows });
@@ -64,13 +85,13 @@ router.get("/expenses", requireAuth, async (req, res) => {
 });
 
 // GET /api/expenses/all (manager)
-// Use LEFT JOIN so it doesn't fail when user_id is NULL (existing bad rows)
+// LEFT JOIN to still work if there are old bad rows (e.g., username NULL in legacy data)
 router.get("/expenses/all", requireAuth, requireManager, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT e.*, u.username
+      `SELECT e.*, u.id AS user_id
        FROM expenses e
-       LEFT JOIN users u ON u.id = e.user_id
+       LEFT JOIN users u ON u.username = e.username
        ORDER BY e.expense_date DESC, e.id DESC`
     );
 

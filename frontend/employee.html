@@ -6,20 +6,21 @@
   <title>Employee • Work Hours App</title>
   <link rel="stylesheet" href="src/css/main.css" />
 </head>
+
 <body>
   <header class="topbar">
-    <div class="brand">Work Hours App</div>
     <div class="brand">
-      <img class="brand-logo" src="assets/logo.jpg" alt="GS" />
+      <img class="brand-logo" src="assets/logo.jpg" alt="logo" />
       <span class="brand-title">Work Hours App</span>
     </div>
+
     <div class="topbar-right">
       <span id="whoami" class="muted"></span>
       <button
         id="logoutBtn"
-        class="btn btn-outline hidden"
-        style="position:relative; z-index:9999; pointer-events:auto;"
+        class="btn btn-outline"
         type="button"
+        style="position:relative; z-index:9999; pointer-events:auto;"
       >
         Logout
       </button>
@@ -109,6 +110,7 @@
     </div>
   </main>
 
-  <script type="module" src="src/js/employee.js"></script>
+  <!-- ✅ cache-bust -->
+  <script type="module" src="src/js/employee.js?v=7"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@
 import { apiGet, apiPost, apiDelete } from "./api.js";
 import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
 
+console.log("✅ employee.js loaded v7 (supports vacation_date)"); // <- verify this appears
+
 function msg(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text || "";
@@ -27,6 +29,13 @@ function filterByMonth(rows, getDateFn, monthStr) {
   return (rows || []).filter((r) => String(getDateFn(r) || "").startsWith(m));
 }
 
+function isoToYmd(s) {
+  // "2026-02-04T00:00:00.000Z" -> "2026-02-04"
+  if (!s) return "";
+  const str = String(s);
+  return str.includes("T") ? str.split("T")[0] : str;
+}
+
 /* ------------ Work Hours ------------ */
 let cacheWorkHours = [];
 
@@ -38,7 +47,7 @@ function renderWorkHours(rows) {
   (rows || []).forEach((r) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${r.work_date}</td>
+      <td>${r.work_date || ""}</td>
       <td>${String(r.start_time || "").slice(0, 5)}</td>
       <td>${String(r.end_time || "").slice(0, 5)}</td>
       <td></td>
@@ -59,7 +68,8 @@ async function loadWorkHours() {
 let cacheVacations = [];
 
 function getVacationDate(v) {
-  return v.vacation_date || v.vac_date || v.date;
+  // ✅ backend returns vacation_date (confirmed in your screenshot)
+  return isoToYmd(v.vacation_date || v.vac_date || v.date);
 }
 
 function renderVacations(rows) {
@@ -70,7 +80,7 @@ function renderVacations(rows) {
   (rows || []).forEach((v) => {
     const d = getVacationDate(v);
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${d ?? ""}</td><td>${v.type ?? ""}</td>`;
+    tr.innerHTML = `<td>${d}</td><td>${v.type ?? ""}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -79,6 +89,7 @@ async function loadVacations() {
   msg("empVacMsg", "Loading...");
   const res = await apiGet("/api/vacations");
   cacheVacations = res.vacations || [];
+  console.log("vacations sample:", cacheVacations[0]); // helpful debug
   renderVacations(cacheVacations);
   msg("empVacMsg", "");
 }
@@ -93,7 +104,7 @@ function renderExpenses(rows) {
 
   (rows || []).forEach((ex) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${ex.expense_date}</td><td>${ex.description}</td><td>${ex.amount}</td>`;
+    tr.innerHTML = `<td>${ex.expense_date || ""}</td><td>${ex.description || ""}</td><td>${ex.amount ?? ""}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -132,7 +143,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadWorkHours();
   });
 
-  // Work hours: Load button + month filter
+  // Work hours: Load + month filter
   document.getElementById("empWhLoad")?.addEventListener("click", async () => {
     await loadWorkHours();
     const m = document.getElementById("empWhMonth")?.value;
@@ -151,7 +162,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // backend accepts vac_date OR vacation_date; we send vac_date
     await apiPost("/api/vacations", { vac_date, type });
     msg("empVacMsg", "Vacation saved ✅");
     await loadVacations();
@@ -170,7 +180,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadVacations();
   });
 
-  // Vacations: Load + month filter (supports vacation_date or vac_date)
+  // Vacations: Load + month filter
   document.getElementById("empVacLoad")?.addEventListener("click", async () => {
     await loadVacations();
     const m = document.getElementById("empVacMonth")?.value;

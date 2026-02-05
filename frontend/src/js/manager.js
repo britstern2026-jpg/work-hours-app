@@ -9,8 +9,12 @@ function msg(id, text) {
 
 function wireLogout() {
   const btn = document.getElementById("logoutBtn");
-  if (!btn) return;
-  btn.classList.remove("hidden");
+  if (!btn) {
+    console.error("❌ logoutBtn not found in manager.html");
+    return;
+  }
+
+  btn.disabled = false;
   btn.addEventListener("click", () => {
     clearAuth();
     window.location.href = "landing.html";
@@ -68,14 +72,14 @@ async function createUser() {
   await loadUsers();
 }
 
-function readManagerTarget() {
+function readTarget() {
   const user_id = Number(document.getElementById("mgrTargetUid")?.value);
   const date = document.getElementById("mgrTargetDate")?.value;
   return { user_id, date };
 }
 
-async function managerSaveWorkHours() {
-  const { user_id, date } = readManagerTarget();
+async function saveWorkHours() {
+  const { user_id, date } = readTarget();
   const start_time = document.getElementById("mgrWhStart")?.value;
   const end_time = document.getElementById("mgrWhEnd")?.value;
 
@@ -94,8 +98,8 @@ async function managerSaveWorkHours() {
   msg("mgrEditMsg", `Work hours ${res.action || "saved"} ✅`);
 }
 
-async function managerSetVacation() {
-  const { user_id, date } = readManagerTarget();
+async function setVacation() {
+  const { user_id, date } = readTarget();
   const type = document.getElementById("mgrVacType")?.value;
 
   if (!user_id || !date || !type) {
@@ -111,3 +115,76 @@ async function managerSetVacation() {
 
   msg("mgrEditMsg", `Vacation ${res.action || "saved"} ✅`);
 }
+
+async function removeVacation() {
+  const { user_id, date } = readTarget();
+
+  if (!user_id || !date) {
+    msg("mgrEditMsg", "Need user UID + date");
+    return;
+  }
+
+  await apiDelete("/api/vacations/manager", {
+    user_id,
+    vac_date: date,
+  });
+
+  msg("mgrEditMsg", "Vacation removed ✅");
+}
+
+function downloadJson(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function doExport() {
+  msg("mgrExportMsg", "Exporting...");
+  const month = document.getElementById("mgrExportMonth")?.value; // YYYY-MM
+
+  const data = await apiGet("/api/export");
+  const filename = month ? `export-${month}.json` : `export-all.json`;
+
+  // If month selected, filter client-side by prefix
+  if (month) {
+    const starts = (d) => String(d || "").startsWith(month);
+
+    const filtered = {
+      users: data.users || [],
+      workHours: (data.workHours || []).filter((r) => starts(r.work_date)),
+      vacations: (data.vacations || []).filter((r) => starts(r.vac_date)),
+      expenses: (data.expenses || []).filter((r) => starts(r.expense_date)),
+    };
+
+    downloadJson(filename, filtered);
+  } else {
+    downloadJson(filename, data);
+  }
+
+  msg("mgrExportMsg", "Downloaded ✅");
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const auth = requireRoleOrRedirect("manager");
+  if (!auth) return;
+
+  const who = document.getElementById("whoami");
+  if (who) who.textContent = `Logged in as ${auth.username}`;
+
+  wireLogout();
+
+  document.getElementById("mgrUsersLoad")?.addEventListener("click", loadUsers);
+  document.getElementById("mgrCreateUser")?.addEventListener("click", createUser);
+
+  document.getElementById("mgrWhSave")?.addEventListener("click", saveWorkHours);
+  document.getElementById("mgrVacSet")?.addEventListener("click", setVacation);
+  document.getElementById("mgrVacRemove")?.addEventListener("click", removeVacation);
+
+  document.getElementById("mgrExport")?.addEventListener("click", doExport);
+});

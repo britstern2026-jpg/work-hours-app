@@ -6,20 +6,21 @@
   <title>Manager • Work Hours App</title>
   <link rel="stylesheet" href="src/css/main.css" />
 </head>
+
 <body>
   <header class="topbar">
-    <div class="brand">Work Hours App</div>
     <div class="brand">
-      <img class="brand-logo" src="assets/logo.jpg" alt="GS" />
+      <img class="brand-logo" src="assets/logo.jpg" alt="logo" />
       <span class="brand-title">Work Hours App</span>
     </div>
+
     <div class="topbar-right">
       <span id="whoami" class="muted"></span>
       <button
         id="logoutBtn"
-        class="btn btn-outline hidden"
-        style="position:relative; z-index:9999; pointer-events:auto;"
+        class="btn btn-outline"
         type="button"
+        style="position:relative; z-index:9999; pointer-events:auto;"
       >
         Logout
       </button>
@@ -30,8 +31,10 @@
     <div class="grid">
       <section class="card">
         <h2>Users (includes passwords)</h2>
+
         <div class="form inline">
           <button id="mgrUsersLoad" class="btn btn-outline" type="button">Load users</button>
+          <div id="mgrUsersMsg" class="muted"></div>
         </div>
 
         <div class="form">
@@ -48,7 +51,6 @@
             </label>
           </div>
           <button id="mgrCreateUser" class="btn" type="button">Create user</button>
-          <div id="mgrUsersMsg" class="muted"></div>
         </div>
 
         <div class="table-wrap">
@@ -61,9 +63,10 @@
 
       <section class="card">
         <h2>Manager edits</h2>
+
         <div class="form">
           <div class="row">
-            <label>User UID <input id="mgrTargetUid" type="text" /></label>
+            <label>User UID <input id="mgrTargetUid" type="number" /></label>
             <label>Date <input id="mgrTargetDate" type="date" /></label>
           </div>
 
@@ -94,10 +97,10 @@
       </section>
 
       <section class="card">
-        <h2>Monthly report (Excel)</h2>
+        <h2>Monthly report (JSON download)</h2>
         <div class="form inline">
           <label>Month <input id="mgrExportMonth" type="month" /></label>
-          <button id="mgrExport" class="btn" type="button">Download XLSX</button>
+          <button id="mgrExport" class="btn" type="button">Download JSON</button>
         </div>
         <div id="mgrExportMsg" class="muted"></div>
       </section>

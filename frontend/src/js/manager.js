@@ -117,7 +117,6 @@ async function createUser(currentUsername) {
     await apiPost("/api/users", { username, password, role });
     msg("mgrUsersMsg", "User created ✅");
   } catch (e) {
-    // if you implemented 409 in backend
     if (e?.status === 409) msg("mgrUsersMsg", "Username already exists");
     else msg("mgrUsersMsg", e?.message || "Failed to create user");
     return;
@@ -126,24 +125,38 @@ async function createUser(currentUsername) {
   await loadUsers(currentUsername);
 }
 
+/**
+ * Read the manager edit target.
+ * Preferred: an input/select with id="mgrTargetUsername"
+ * Backward-compatible: uses the existing "mgrTargetUid" field but treats it as username text.
+ */
 function readTarget() {
-  const user_id = Number(document.getElementById("mgrTargetUid")?.value);
+  const usernameFromNewField = document
+    .getElementById("mgrTargetUsername")
+    ?.value?.trim();
+
+  const usernameFromOldField = document
+    .getElementById("mgrTargetUid")
+    ?.value?.trim();
+
+  const username = usernameFromNewField || usernameFromOldField || "";
   const date = document.getElementById("mgrTargetDate")?.value;
-  return { user_id, date };
+
+  return { username, date };
 }
 
 async function saveWorkHours() {
-  const { user_id, date } = readTarget();
+  const { username, date } = readTarget();
   const start_time = document.getElementById("mgrWhStart")?.value;
   const end_time = document.getElementById("mgrWhEnd")?.value;
 
-  if (!user_id || !date || !start_time || !end_time) {
-    msg("mgrEditMsg", "Need user UID + date + start + end");
+  if (!username || !date || !start_time || !end_time) {
+    msg("mgrEditMsg", "Need username + date + start + end");
     return;
   }
 
   const res = await apiPost("/api/work-hours/manager", {
-    user_id,
+    username,
     work_date: date,
     start_time,
     end_time,
@@ -153,16 +166,16 @@ async function saveWorkHours() {
 }
 
 async function setVacation() {
-  const { user_id, date } = readTarget();
+  const { username, date } = readTarget();
   const type = document.getElementById("mgrVacType")?.value;
 
-  if (!user_id || !date || !type) {
-    msg("mgrEditMsg", "Need user UID + date + type");
+  if (!username || !date || !type) {
+    msg("mgrEditMsg", "Need username + date + type");
     return;
   }
 
   const res = await apiPost("/api/vacations/manager", {
-    user_id,
+    username,
     vac_date: date,
     type,
   });
@@ -171,15 +184,15 @@ async function setVacation() {
 }
 
 async function removeVacation() {
-  const { user_id, date } = readTarget();
+  const { username, date } = readTarget();
 
-  if (!user_id || !date) {
-    msg("mgrEditMsg", "Need user UID + date");
+  if (!username || !date) {
+    msg("mgrEditMsg", "Need username + date");
     return;
   }
 
   await apiDelete("/api/vacations/manager", {
-    user_id,
+    username,
     vac_date: date,
   });
 
@@ -187,7 +200,9 @@ async function removeVacation() {
 }
 
 function downloadJson(filename, obj) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -210,7 +225,9 @@ async function doExport() {
     const filtered = {
       users: data.users || [],
       workHours: (data.workHours || []).filter((r) => starts(r.work_date)),
-      vacations: (data.vacations || []).filter((r) => starts(r.vac_date || r.vacation_date)),
+      vacations: (data.vacations || []).filter((r) =>
+        starts(r.vac_date || r.vacation_date)
+      ),
       expenses: (data.expenses || []).filter((r) => starts(r.expense_date)),
     };
     downloadJson(filename, filtered);
@@ -230,15 +247,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
-  document.getElementById("mgrUsersLoad")?.addEventListener("click", () => loadUsers(auth.username));
-  document.getElementById("mgrCreateUser")?.addEventListener("click", () => createUser(auth.username));
+  document
+    .getElementById("mgrUsersLoad")
+    ?.addEventListener("click", () => loadUsers(auth.username));
+  document
+    .getElementById("mgrCreateUser")
+    ?.addEventListener("click", () => createUser(auth.username));
 
   document.getElementById("mgrWhSave")?.addEventListener("click", saveWorkHours);
   document.getElementById("mgrVacSet")?.addEventListener("click", setVacation);
-  document.getElementById("mgrVacRemove")?.addEventListener("click", removeVacation);
+  document
+    .getElementById("mgrVacRemove")
+    ?.addEventListener("click", removeVacation);
 
   document.getElementById("mgrExport")?.addEventListener("click", doExport);
 
-  // auto-load users (optional). If you don't want it, delete the next line:
   await loadUsers(auth.username);
 });

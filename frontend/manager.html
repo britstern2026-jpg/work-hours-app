@@ -66,7 +66,9 @@
 
         <div class="form">
           <div class="row">
-            <label>User UID <input id="mgrTargetUid" type="number" /></label>
+            <!-- ✅ UI change: Username instead of UID.
+                 NOTE: keeping id="mgrTargetUid" so existing JS works without extra HTML wiring. -->
+            <label>Username <input id="mgrTargetUid" type="text" placeholder="e.g. matti" autocomplete="username" /></label>
             <label>Date <input id="mgrTargetDate" type="date" /></label>
           </div>
 

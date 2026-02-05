@@ -55,21 +55,55 @@
 
         <div class="table-wrap">
           <table class="table" id="mgrUsersTable">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Password</th>
-                <th>UID</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Username</th><th>Role</th><th>Password</th><th>UID</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
       </section>
 
-      <!-- everything else unchanged -->
+      <section class="card">
+        <h2>Manager edits</h2>
+
+        <div class="form">
+          <div class="row">
+            <label>User UID <input id="mgrTargetUid" type="number" /></label>
+            <label>Date <input id="mgrTargetDate" type="date" /></label>
+          </div>
+
+          <h3>Work hours</h3>
+          <div class="row">
+            <label>Start <input id="mgrWhStart" type="time" /></label>
+            <label>End <input id="mgrWhEnd" type="time" /></label>
+            <button id="mgrWhSave" class="btn" type="button">Save work hours</button>
+          </div>
+
+          <h3>Vacation</h3>
+          <div class="row">
+            <label>
+              Type
+              <select id="mgrVacType">
+                <option value="vacation">Vacation</option>
+                <option value="sick">Sick</option>
+                <option value="child_sick">Child sick</option>
+                <option value="reserve">Reserve</option>
+              </select>
+            </label>
+            <button id="mgrVacSet" class="btn" type="button">Set vacation</button>
+            <button id="mgrVacRemove" class="btn btn-outline" type="button">Remove vacation</button>
+          </div>
+
+          <div id="mgrEditMsg" class="muted"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Monthly report (JSON download)</h2>
+        <div class="form inline">
+          <label>Month <input id="mgrExportMonth" type="month" /></label>
+          <button id="mgrExport" class="btn" type="button">Download JSON</button>
+        </div>
+        <div id="mgrExportMsg" class="muted"></div>
+      </section>
     </div>
   </main>
 

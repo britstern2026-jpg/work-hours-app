@@ -9,12 +9,8 @@ function msg(id, text) {
 
 function wireLogout() {
   const btn = document.getElementById("logoutBtn");
-  if (!btn) {
-    console.error("❌ logoutBtn not found in manager.html");
-    return;
-  }
+  if (!btn) return;
 
-  btn.disabled = false;
   btn.addEventListener("click", () => {
     clearAuth();
     window.location.href = "landing.html";
@@ -33,31 +29,64 @@ function getOrCreateTbody(tableId) {
   return tbody;
 }
 
-function renderUsers(users) {
+function renderUsers(users, currentUsername) {
   const tbody = getOrCreateTbody("mgrUsersTable");
   if (!tbody) return;
 
   tbody.innerHTML = "";
+
   (users || []).forEach((u) => {
+    const canDelete = u.username !== "admin" && u.username !== currentUsername;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${u.username ?? ""}</td>
       <td>${u.role ?? ""}</td>
       <td>${u.password ?? ""}</td>
       <td>${u.id ?? ""}</td>
+      <td>
+        <button
+          class="btn btn-outline"
+          type="button"
+          data-del-username="${u.username}"
+          ${canDelete ? "" : "disabled"}
+        >
+          Delete
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
+
+  // wire delete buttons
+  tbody.querySelectorAll("button[data-del-username]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const username = btn.getAttribute("data-del-username");
+      if (!username) return;
+
+      if (!confirm(`Delete user "${username}"?`)) return;
+
+      try {
+        btn.disabled = true;
+        await apiDelete(`/api/users/by-username/${encodeURIComponent(username)}`);
+        msg("mgrUsersMsg", `Deleted ${username} ✅`);
+        await loadUsers(currentUsername);
+      } catch (e) {
+        msg("mgrUsersMsg", e?.message || "Delete failed");
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
-async function loadUsers() {
+async function loadUsers(currentUsername) {
   msg("mgrUsersMsg", "Loading...");
   const res = await apiGet("/api/users");
-  renderUsers(res.users || []);
+  renderUsers(res.users || [], currentUsername);
   msg("mgrUsersMsg", `Loaded ${res.users?.length || 0} users ✅`);
 }
 
-async function createUser() {
+async function createUser(currentUsername) {
   const username = document.getElementById("mgrNewUsername")?.value?.trim();
   const password = document.getElementById("mgrNewPassword")?.value;
   const role = document.getElementById("mgrNewRole")?.value;
@@ -67,107 +96,13 @@ async function createUser() {
     return;
   }
 
-  await apiPost("/api/users", { username, password, role });
-  msg("mgrUsersMsg", "User created ✅");
-  await loadUsers();
-}
-
-function readTarget() {
-  const user_id = Number(document.getElementById("mgrTargetUid")?.value);
-  const date = document.getElementById("mgrTargetDate")?.value;
-  return { user_id, date };
-}
-
-async function saveWorkHours() {
-  const { user_id, date } = readTarget();
-  const start_time = document.getElementById("mgrWhStart")?.value;
-  const end_time = document.getElementById("mgrWhEnd")?.value;
-
-  if (!user_id || !date || !start_time || !end_time) {
-    msg("mgrEditMsg", "Need user UID + date + start + end");
-    return;
+  try {
+    await apiPost("/api/users", { username, password, role });
+    msg("mgrUsersMsg", "User created ✅");
+    await loadUsers(currentUsername);
+  } catch (e) {
+    msg("mgrUsersMsg", e?.message || "Create failed");
   }
-
-  const res = await apiPost("/api/work-hours/manager", {
-    user_id,
-    work_date: date,
-    start_time,
-    end_time,
-  });
-
-  msg("mgrEditMsg", `Work hours ${res.action || "saved"} ✅`);
-}
-
-async function setVacation() {
-  const { user_id, date } = readTarget();
-  const type = document.getElementById("mgrVacType")?.value;
-
-  if (!user_id || !date || !type) {
-    msg("mgrEditMsg", "Need user UID + date + type");
-    return;
-  }
-
-  const res = await apiPost("/api/vacations/manager", {
-    user_id,
-    vac_date: date,
-    type,
-  });
-
-  msg("mgrEditMsg", `Vacation ${res.action || "saved"} ✅`);
-}
-
-async function removeVacation() {
-  const { user_id, date } = readTarget();
-
-  if (!user_id || !date) {
-    msg("mgrEditMsg", "Need user UID + date");
-    return;
-  }
-
-  await apiDelete("/api/vacations/manager", {
-    user_id,
-    vac_date: date,
-  });
-
-  msg("mgrEditMsg", "Vacation removed ✅");
-}
-
-function downloadJson(filename, obj) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function doExport() {
-  msg("mgrExportMsg", "Exporting...");
-  const month = document.getElementById("mgrExportMonth")?.value; // YYYY-MM
-
-  const data = await apiGet("/api/export");
-  const filename = month ? `export-${month}.json` : `export-all.json`;
-
-  // If month selected, filter client-side by prefix
-  if (month) {
-    const starts = (d) => String(d || "").startsWith(month);
-
-    const filtered = {
-      users: data.users || [],
-      workHours: (data.workHours || []).filter((r) => starts(r.work_date)),
-      vacations: (data.vacations || []).filter((r) => starts(r.vac_date)),
-      expenses: (data.expenses || []).filter((r) => starts(r.expense_date)),
-    };
-
-    downloadJson(filename, filtered);
-  } else {
-    downloadJson(filename, data);
-  }
-
-  msg("mgrExportMsg", "Downloaded ✅");
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -179,12 +114,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
-  document.getElementById("mgrUsersLoad")?.addEventListener("click", loadUsers);
-  document.getElementById("mgrCreateUser")?.addEventListener("click", createUser);
+  document
+    .getElementById("mgrUsersLoad")
+    ?.addEventListener("click", () => loadUsers(auth.username));
 
-  document.getElementById("mgrWhSave")?.addEventListener("click", saveWorkHours);
-  document.getElementById("mgrVacSet")?.addEventListener("click", setVacation);
-  document.getElementById("mgrVacRemove")?.addEventListener("click", removeVacation);
-
-  document.getElementById("mgrExport")?.addEventListener("click", doExport);
+  document
+    .getElementById("mgrCreateUser")
+    ?.addEventListener("click", () => createUser(auth.username));
 });

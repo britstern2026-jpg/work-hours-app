@@ -5,8 +5,31 @@ const { requireAuth, requireManager } = require("./welcome");
 
 const router = express.Router();
 
-function getUserId(req) {
-  return req?.user?.id ?? req?.user?.uid ?? req?.user?.user_id ?? null;
+/**
+ * Your DB schema is username-based (vacations.username FK -> users.username).
+ * So we use username everywhere.
+ * For manager routes we allow either:
+ *  - username (preferred)
+ *  - user_id (legacy) -> we resolve to username via users table
+ */
+
+function getUsernameFromToken(req) {
+  return req?.user?.username ?? null;
+}
+
+async function resolveUsernameFromBody(body) {
+  const username = body?.username?.trim();
+  if (username) return username;
+
+  const user_id = body?.user_id ?? body?.uid ?? body?.id;
+  if (user_id === undefined || user_id === null || user_id === "") return null;
+
+  // If it's numeric, try resolve id -> username
+  const n = Number(user_id);
+  if (!Number.isFinite(n)) return null;
+
+  const r = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1`, [n]);
+  return r.rows[0]?.username ?? null;
 }
 
 // Try SQL with vacation_date first; if DB uses vac_date, fallback.
@@ -15,7 +38,6 @@ async function runWithDateColumn(sqlVacationDate, sqlVacDate, params) {
     return await query(sqlVacationDate, params);
   } catch (err) {
     const msg = String(err?.message || "");
-    // common Postgres error message: column "vacation_date" does not exist
     if (msg.includes("does not exist") || msg.includes("column")) {
       return await query(sqlVacDate, params);
     }
@@ -24,39 +46,46 @@ async function runWithDateColumn(sqlVacationDate, sqlVacDate, params) {
 }
 
 /** Returns { exists: boolean, row?: any } */
-async function vacationExists(userId, date) {
+async function vacationExists(username, date) {
   const r = await runWithDateColumn(
-    `SELECT id, user_id, vacation_date, type, created_at
+    `SELECT id, username, vacation_date, type, created_at
      FROM vacations
-     WHERE user_id = $1 AND vacation_date = $2
+     WHERE username = $1 AND vacation_date = $2
      ORDER BY id DESC
      LIMIT 1`,
-    `SELECT id, user_id, vac_date, type, created_at
+    `SELECT id, username, vac_date, type, created_at
      FROM vacations
-     WHERE user_id = $1 AND vac_date = $2
+     WHERE username = $1 AND vac_date = $2
      ORDER BY id DESC
      LIMIT 1`,
-    [userId, date]
+    [username, date]
   );
 
   if (r.rows.length) return { exists: true, row: r.rows[0] };
   return { exists: false };
 }
 
-// POST /api/vacations (employee own)  ✅ now: do NOT allow duplicate date
+/**
+ * POST /api/vacations (employee own)
+ * Body: { vacation_date|vac_date|date, type }
+ */
 router.post("/vacations", requireAuth, async (req, res) => {
   try {
     const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
     const { type } = req.body || {};
 
     if (!date || !type) {
-      return res.status(400).json({ error: "date (vacation_date/vac_date) and type are required" });
+      return res
+        .status(400)
+        .json({ error: "date (vacation_date/vac_date) and type are required" });
     }
 
-    const userId = getUserId(req);
-    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    const username = getUsernameFromToken(req);
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    }
 
-    const exists = await vacationExists(userId, date);
+    const exists = await vacationExists(username, date);
     if (exists.exists) {
       return res.status(409).json({
         error: "Vacation already exists for this date",
@@ -65,13 +94,13 @@ router.post("/vacations", requireAuth, async (req, res) => {
     }
 
     const inserted = await runWithDateColumn(
-      `INSERT INTO vacations (user_id, vacation_date, type)
+      `INSERT INTO vacations (username, vacation_date, type)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      `INSERT INTO vacations (user_id, vac_date, type)
+      `INSERT INTO vacations (username, vac_date, type)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      [userId, date, type]
+      [username, date, type]
     );
 
     return res.json({ ok: true, vacation: inserted.rows[0], action: "created" });
@@ -81,19 +110,26 @@ router.post("/vacations", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/vacations (employee own by date)
+/**
+ * DELETE /api/vacations (employee own by date)
+ * Body: { vacation_date|vac_date|date }
+ */
 router.delete("/vacations", requireAuth, async (req, res) => {
   try {
     const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
-    if (!date) return res.status(400).json({ error: "date (vacation_date/vac_date) is required" });
+    if (!date) {
+      return res.status(400).json({ error: "date (vacation_date/vac_date) is required" });
+    }
 
-    const userId = getUserId(req);
-    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    const username = getUsernameFromToken(req);
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    }
 
     await runWithDateColumn(
-      `DELETE FROM vacations WHERE user_id = $1 AND vacation_date = $2`,
-      `DELETE FROM vacations WHERE user_id = $1 AND vac_date = $2`,
-      [userId, date]
+      `DELETE FROM vacations WHERE username = $1 AND vacation_date = $2`,
+      `DELETE FROM vacations WHERE username = $1 AND vac_date = $2`,
+      [username, date]
     );
 
     return res.json({ ok: true });
@@ -103,74 +139,20 @@ router.delete("/vacations", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/vacations/manager (manager set) ✅ now: do NOT allow duplicate date
-router.post("/vacations/manager", requireAuth, requireManager, async (req, res) => {
-  try {
-    const { user_id, type } = req.body || {};
-    const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
-
-    if (!user_id || !date || !type) {
-      return res.status(400).json({ error: "user_id, date (vacation_date/vac_date), type are required" });
-    }
-
-    const exists = await vacationExists(user_id, date);
-    if (exists.exists) {
-      return res.status(409).json({
-        error: "Vacation already exists for this date",
-        existing: exists.row,
-      });
-    }
-
-    const inserted = await runWithDateColumn(
-      `INSERT INTO vacations (user_id, vacation_date, type)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      `INSERT INTO vacations (user_id, vac_date, type)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [user_id, date, type]
-    );
-
-    return res.json({ ok: true, vacation: inserted.rows[0], action: "created" });
-  } catch (err) {
-    console.error("vacations manager set error:", err);
-    return res.status(500).json({ error: "Server error", details: String(err.message || err) });
-  }
-});
-
-// DELETE /api/vacations/manager (manager remove)
-router.delete("/vacations/manager", requireAuth, requireManager, async (req, res) => {
-  try {
-    const { user_id } = req.body || {};
-    const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
-
-    if (!user_id || !date) {
-      return res.status(400).json({ error: "user_id and date (vacation_date/vac_date) are required" });
-    }
-
-    await runWithDateColumn(
-      `DELETE FROM vacations WHERE user_id = $1 AND vacation_date = $2`,
-      `DELETE FROM vacations WHERE user_id = $1 AND vac_date = $2`,
-      [user_id, date]
-    );
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("vacations manager delete error:", err);
-    return res.status(500).json({ error: "Server error", details: String(err.message || err) });
-  }
-});
-
-// GET /api/vacations (employee own)
+/**
+ * GET /api/vacations (employee own)
+ */
 router.get("/vacations", requireAuth, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    const username = getUsernameFromToken(req);
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    }
 
     const r = await runWithDateColumn(
-      `SELECT * FROM vacations WHERE user_id = $1 ORDER BY vacation_date DESC, id DESC`,
-      `SELECT * FROM vacations WHERE user_id = $1 ORDER BY vac_date DESC, id DESC`,
-      [userId]
+      `SELECT * FROM vacations WHERE username = $1 ORDER BY vacation_date DESC, id DESC`,
+      `SELECT * FROM vacations WHERE username = $1 ORDER BY vac_date DESC, id DESC`,
+      [username]
     );
 
     return res.json({ vacations: r.rows });
@@ -180,17 +162,88 @@ router.get("/vacations", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/vacations/all (manager)
+/**
+ * POST /api/vacations/manager (manager set)
+ * Body: { username OR user_id, vacation_date|vac_date|date, type }
+ */
+router.post("/vacations/manager", requireAuth, requireManager, async (req, res) => {
+  try {
+    const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
+    const { type } = req.body || {};
+
+    const username = await resolveUsernameFromBody(req.body);
+    if (!username || !date || !type) {
+      return res.status(400).json({
+        error: "username (preferred) or user_id, date (vacation_date/vac_date), and type are required",
+      });
+    }
+
+    const exists = await vacationExists(username, date);
+    if (exists.exists) {
+      return res.status(409).json({
+        error: "Vacation already exists for this date",
+        existing: exists.row,
+      });
+    }
+
+    const inserted = await runWithDateColumn(
+      `INSERT INTO vacations (username, vacation_date, type)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      `INSERT INTO vacations (username, vac_date, type)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [username, date, type]
+    );
+
+    return res.json({ ok: true, vacation: inserted.rows[0], action: "created" });
+  } catch (err) {
+    console.error("vacations manager set error:", err);
+    return res.status(500).json({ error: "Server error", details: String(err.message || err) });
+  }
+});
+
+/**
+ * DELETE /api/vacations/manager (manager remove)
+ * Body: { username OR user_id, vacation_date|vac_date|date }
+ */
+router.delete("/vacations/manager", requireAuth, requireManager, async (req, res) => {
+  try {
+    const date = req.body?.vacation_date || req.body?.vac_date || req.body?.date;
+    const username = await resolveUsernameFromBody(req.body);
+
+    if (!username || !date) {
+      return res.status(400).json({
+        error: "username (preferred) or user_id, and date (vacation_date/vac_date) are required",
+      });
+    }
+
+    await runWithDateColumn(
+      `DELETE FROM vacations WHERE username = $1 AND vacation_date = $2`,
+      `DELETE FROM vacations WHERE username = $1 AND vac_date = $2`,
+      [username, date]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("vacations manager delete error:", err);
+    return res.status(500).json({ error: "Server error", details: String(err.message || err) });
+  }
+});
+
+/**
+ * GET /api/vacations/all (manager)
+ */
 router.get("/vacations/all", requireAuth, requireManager, async (req, res) => {
   try {
     const r = await runWithDateColumn(
-      `SELECT v.*, u.username
+      `SELECT v.*, u.id AS user_id
        FROM vacations v
-       JOIN users u ON u.id = v.user_id
+       LEFT JOIN users u ON u.username = v.username
        ORDER BY v.vacation_date DESC, v.id DESC`,
-      `SELECT v.*, u.username
+      `SELECT v.*, u.id AS user_id
        FROM vacations v
-       JOIN users u ON u.id = v.user_id
+       LEFT JOIN users u ON u.username = v.username
        ORDER BY v.vac_date DESC, v.id DESC`,
       []
     );

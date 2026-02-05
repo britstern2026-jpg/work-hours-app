@@ -40,27 +40,27 @@ function wireUserDeleteButtons(tbody, currentUsername) {
       if (!username) return;
 
       if (username === "admin") {
-        msg("mgrUsersMsg", "Refusing to delete admin user");
+        msg("mgrUsersMsg", "לא ניתן למחוק את המשתמש admin");
         return;
       }
 
       if (username === currentUsername) {
-        msg("mgrUsersMsg", "You cannot delete yourself");
+        msg("mgrUsersMsg", "לא ניתן למחוק את עצמך");
         return;
       }
 
       const ok = confirm(
-        `Delete user "${username}"?\n\nThis will also delete their work hours, vacations, and expenses.`
+        `למחוק את המשתמש "${username}"?\n\nפעולה זו תמחק גם שעות עבודה, חופשות והוצאות.`
       );
       if (!ok) return;
 
       try {
         btn.disabled = true;
         await apiDelete(`/api/users/by-username/${encodeURIComponent(username)}`);
-        msg("mgrUsersMsg", `Deleted "${username}" ✅`);
+        msg("mgrUsersMsg", `המשתמש "${username}" נמחק ✅`);
         await loadUsers(currentUsername);
       } catch (e) {
-        msg("mgrUsersMsg", e?.message || "Failed to delete user");
+        msg("mgrUsersMsg", e?.message || "מחיקת המשתמש נכשלה");
         btn.disabled = false;
       }
     });
@@ -86,7 +86,7 @@ function renderUsers(users, currentUsername) {
           data-del-username="${u.username ?? ""}"
           ${canDelete ? "" : "disabled"}
         >
-          Delete
+          מחיקה
         </button>
       </td>
     `;
@@ -97,10 +97,10 @@ function renderUsers(users, currentUsername) {
 }
 
 async function loadUsers(currentUsername) {
-  msg("mgrUsersMsg", "Loading...");
+  msg("mgrUsersMsg", "טוען...");
   const res = await apiGet("/api/users");
   renderUsers(res.users || [], currentUsername);
-  msg("mgrUsersMsg", `Loaded ${res.users?.length || 0} users ✅`);
+  msg("mgrUsersMsg", `נטענו ${res.users?.length || 0} משתמשים ✅`);
 }
 
 async function createUser(currentUsername) {
@@ -109,16 +109,16 @@ async function createUser(currentUsername) {
   const role = document.getElementById("mgrNewRole")?.value;
 
   if (!username || !password) {
-    msg("mgrUsersMsg", "Username + password required");
+    msg("mgrUsersMsg", "יש להזין שם משתמש וסיסמה");
     return;
   }
 
   try {
     await apiPost("/api/users", { username, password, role });
-    msg("mgrUsersMsg", "User created ✅");
+    msg("mgrUsersMsg", "המשתמש נוצר ✅");
   } catch (e) {
-    if (e?.status === 409) msg("mgrUsersMsg", "Username already exists");
-    else msg("mgrUsersMsg", e?.message || "Failed to create user");
+    if (e?.status === 409) msg("mgrUsersMsg", "שם המשתמש כבר קיים");
+    else msg("mgrUsersMsg", e?.message || "יצירת המשתמש נכשלה");
     return;
   }
 
@@ -151,7 +151,7 @@ async function saveWorkHours() {
   const end_time = document.getElementById("mgrWhEnd")?.value;
 
   if (!username || !date || !start_time || !end_time) {
-    msg("mgrEditMsg", "Need username + date + start + end");
+    msg("mgrEditMsg", "יש להזין שם משתמש, תאריך, שעת התחלה ושעת סיום");
     return;
   }
 
@@ -162,7 +162,7 @@ async function saveWorkHours() {
     end_time,
   });
 
-  msg("mgrEditMsg", `Work hours ${res.action || "saved"} ✅`);
+  msg("mgrEditMsg", `שעות העבודה ${res.action || "נשמרו"} ✅`);
 }
 
 async function setVacation() {
@@ -170,7 +170,7 @@ async function setVacation() {
   const type = document.getElementById("mgrVacType")?.value;
 
   if (!username || !date || !type) {
-    msg("mgrEditMsg", "Need username + date + type");
+    msg("mgrEditMsg", "יש להזין שם משתמש, תאריך וסוג");
     return;
   }
 
@@ -180,14 +180,14 @@ async function setVacation() {
     type,
   });
 
-  msg("mgrEditMsg", `Vacation ${res.action || "saved"} ✅`);
+  msg("mgrEditMsg", `החופשה ${res.action || "נשמרה"} ✅`);
 }
 
 async function removeVacation() {
   const { username, date } = readTarget();
 
   if (!username || !date) {
-    msg("mgrEditMsg", "Need username + date");
+    msg("mgrEditMsg", "יש להזין שם משתמש ותאריך");
     return;
   }
 
@@ -196,7 +196,7 @@ async function removeVacation() {
     vac_date: date,
   });
 
-  msg("mgrEditMsg", "Vacation removed ✅");
+  msg("mgrEditMsg", "החופשה הוסרה ✅");
 }
 
 function downloadJson(filename, obj) {
@@ -214,7 +214,7 @@ function downloadJson(filename, obj) {
 }
 
 async function doExport() {
-  msg("mgrExportMsg", "Exporting...");
+  msg("mgrExportMsg", "מייצא...");
   const month = document.getElementById("mgrExportMonth")?.value; // YYYY-MM
 
   const data = await apiGet("/api/export");
@@ -235,7 +235,7 @@ async function doExport() {
     downloadJson(filename, data);
   }
 
-  msg("mgrExportMsg", "Downloaded ✅");
+  msg("mgrExportMsg", "הורד ✅");
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!auth) return;
 
   const who = document.getElementById("whoami");
-  if (who) who.textContent = `Logged in as ${auth.username}`;
+  if (who) who.textContent = `מחובר כ־${auth.username}`;
 
   wireLogout();
 

@@ -4,7 +4,7 @@
 const KEY = "workhours_auth_v1";
 
 export function setAuth({ token, role, username }) {
-  if (!token) throw new Error("setAuth: token is required");
+  if (!token) throw new Error("setAuth: נדרש טוקן");
   const payload = { token, role, username, savedAt: Date.now() };
   localStorage.setItem(KEY, JSON.stringify(payload));
 }

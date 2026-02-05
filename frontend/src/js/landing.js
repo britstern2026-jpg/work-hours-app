@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const password = passInput.value;
 
     if (!username || !password) {
-      showError("Please enter username and password.");
+      showError("נא להזין שם משתמש וסיסמה.");
       disableLogin(false);
       return;
     }
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
         data.role === "manager" ? "manager.html" : "employee.html";
     } catch (err) {
       console.error(err);
-      showError(err?.message || "Login failed");
+      showError(err?.message || "ההתחברות נכשלה");
       disableLogin(false);
     }
   }

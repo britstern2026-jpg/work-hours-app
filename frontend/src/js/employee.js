@@ -2,7 +2,7 @@
 import { apiGet, apiPost, apiDelete } from "./api.js";
 import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
 
-console.log("✅ employee.js loaded v8 (fix expenses load + tbody + ISO dates)");
+console.log("✅ employee.js loaded v9 (only load lists on button click)");
 
 function msg(id, text) {
   const el = document.getElementById(id);
@@ -77,6 +77,7 @@ async function loadWorkHours() {
 
 /* ------------ Vacations ------------ */
 let cacheVacations = [];
+let vacationsVisible = false;
 
 function getVacationDate(v) {
   return isoToYmd(v.vacation_date || v.vac_date || v.date);
@@ -105,6 +106,7 @@ async function loadVacations() {
 
 /* ------------ Expenses ------------ */
 let cacheExpenses = [];
+let expensesVisible = false;
 
 function getExpenseDate(ex) {
   return isoToYmd(ex.expense_date || ex.date);
@@ -131,9 +133,6 @@ async function loadExpenses() {
   msg("empExpMsg", "Loading...");
   const res = await apiGet("/api/expenses");
   cacheExpenses = res.expenses || [];
-
-  console.log("expenses loaded:", cacheExpenses.length, "sample:", cacheExpenses[0]);
-
   renderExpenses(cacheExpenses);
   msg("empExpMsg", "");
 }
@@ -148,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireLogout();
 
-  // Work hours: Save
+  // Work hours: Save (keeps existing behavior: refresh immediately)
   document.getElementById("empWhSave")?.addEventListener("click", async () => {
     const work_date = document.getElementById("empWhDate")?.value;
     const start_time = document.getElementById("empWhStart")?.value;
@@ -173,7 +172,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     msg("empWhMsg", m ? `Showing ${m}` : "");
   });
 
-  // Vacation: Save (409 expected if already exists)
+  // Vacation: Save (NO auto-load list unless it is currently visible)
   document.getElementById("empVacSave")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     const type = document.getElementById("empVacType")?.value;
@@ -192,10 +191,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    await loadVacations();
+    // ✅ Only refresh table if user pressed Load before
+    if (vacationsVisible) {
+      await loadVacations();
+      const m = document.getElementById("empVacMonth")?.value;
+      const filtered = filterByMonth(cacheVacations, getVacationDate, m);
+      renderVacations(filtered);
+      msg("empVacMsg", m ? `Showing ${m}` : "");
+    }
   });
 
-  // Vacation: Delete
+  // Vacation: Delete (NO auto-load list unless it is currently visible)
   document.getElementById("empVacDelete")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     if (!vac_date) {
@@ -205,11 +211,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await apiDelete("/api/vacations", { vac_date });
     msg("empVacMsg", "Vacation removed ✅");
-    await loadVacations();
+
+    // ✅ Only refresh table if user pressed Load before
+    if (vacationsVisible) {
+      await loadVacations();
+      const m = document.getElementById("empVacMonth")?.value;
+      const filtered = filterByMonth(cacheVacations, getVacationDate, m);
+      renderVacations(filtered);
+      msg("empVacMsg", m ? `Showing ${m}` : "");
+    }
   });
 
   // Vacations: Load + month filter
   document.getElementById("empVacLoad")?.addEventListener("click", async () => {
+    vacationsVisible = true;
     await loadVacations();
     const m = document.getElementById("empVacMonth")?.value;
     const filtered = filterByMonth(cacheVacations, getVacationDate, m);
@@ -217,7 +232,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     msg("empVacMsg", m ? `Showing ${m}` : "");
   });
 
-  // Expense: Add
+  // Expense: Add (NO auto-load list unless it is currently visible)
   document.getElementById("empExpAdd")?.addEventListener("click", async () => {
     const expense_date = document.getElementById("empExpDate")?.value;
     const amount = document.getElementById("empExpAmount")?.value;
@@ -230,11 +245,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await apiPost("/api/expenses", { expense_date, description, amount: Number(amount) });
     msg("empExpMsg", "Expense saved ✅");
-    await loadExpenses();
+
+    // ✅ Only refresh table if user pressed Load before
+    if (expensesVisible) {
+      await loadExpenses();
+      const m = document.getElementById("empExpMonth")?.value;
+      const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);
+      renderExpenses(filtered);
+      msg("empExpMsg", m ? `Showing ${m}` : "");
+    }
   });
 
   // Expenses: Load + month filter
   document.getElementById("empExpLoad")?.addEventListener("click", async () => {
+    expensesVisible = true;
     await loadExpenses();
     const m = document.getElementById("empExpMonth")?.value;
     const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);

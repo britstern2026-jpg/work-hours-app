@@ -2,7 +2,7 @@
 import { apiGet, apiPost, apiDelete } from "./api.js";
 import { requireRoleOrRedirect, clearAuth } from "./welcome.js";
 
-console.log("✅ employee.js loaded v7 (supports vacation_date)"); // <- verify this appears
+console.log("✅ employee.js loaded v8 (fix expenses load + tbody + ISO dates)");
 
 function msg(id, text) {
   const el = document.getElementById(id);
@@ -19,6 +19,24 @@ function wireLogout() {
   });
 }
 
+function isoToYmd(s) {
+  if (!s) return "";
+  const str = String(s);
+  return str.includes("T") ? str.split("T")[0] : str;
+}
+
+function ensureTbody(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return null;
+
+  let tbody = table.querySelector("tbody");
+  if (!tbody) {
+    tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+  }
+  return tbody;
+}
+
 function monthPrefix(monthStr) {
   return String(monthStr || "").trim(); // "YYYY-MM"
 }
@@ -29,18 +47,11 @@ function filterByMonth(rows, getDateFn, monthStr) {
   return (rows || []).filter((r) => String(getDateFn(r) || "").startsWith(m));
 }
 
-function isoToYmd(s) {
-  // "2026-02-04T00:00:00.000Z" -> "2026-02-04"
-  if (!s) return "";
-  const str = String(s);
-  return str.includes("T") ? str.split("T")[0] : str;
-}
-
 /* ------------ Work Hours ------------ */
 let cacheWorkHours = [];
 
 function renderWorkHours(rows) {
-  const tbody = document.querySelector("#empWhTable tbody");
+  const tbody = ensureTbody("empWhTable");
   if (!tbody) return;
   tbody.innerHTML = "";
 
@@ -68,12 +79,11 @@ async function loadWorkHours() {
 let cacheVacations = [];
 
 function getVacationDate(v) {
-  // ✅ backend returns vacation_date (confirmed in your screenshot)
   return isoToYmd(v.vacation_date || v.vac_date || v.date);
 }
 
 function renderVacations(rows) {
-  const tbody = document.querySelector("#empVacTable tbody");
+  const tbody = ensureTbody("empVacTable");
   if (!tbody) return;
   tbody.innerHTML = "";
 
@@ -89,7 +99,6 @@ async function loadVacations() {
   msg("empVacMsg", "Loading...");
   const res = await apiGet("/api/vacations");
   cacheVacations = res.vacations || [];
-  console.log("vacations sample:", cacheVacations[0]); // helpful debug
   renderVacations(cacheVacations);
   msg("empVacMsg", "");
 }
@@ -97,14 +106,23 @@ async function loadVacations() {
 /* ------------ Expenses ------------ */
 let cacheExpenses = [];
 
+function getExpenseDate(ex) {
+  return isoToYmd(ex.expense_date || ex.date);
+}
+
 function renderExpenses(rows) {
-  const tbody = document.querySelector("#empExpTable tbody");
+  const tbody = ensureTbody("empExpTable");
   if (!tbody) return;
+
   tbody.innerHTML = "";
 
   (rows || []).forEach((ex) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${ex.expense_date || ""}</td><td>${ex.description || ""}</td><td>${ex.amount ?? ""}</td>`;
+    tr.innerHTML = `
+      <td>${getExpenseDate(ex)}</td>
+      <td>${ex.description ?? ""}</td>
+      <td>${ex.amount ?? ""}</td>
+    `;
     tbody.appendChild(tr);
   });
 }
@@ -113,6 +131,9 @@ async function loadExpenses() {
   msg("empExpMsg", "Loading...");
   const res = await apiGet("/api/expenses");
   cacheExpenses = res.expenses || [];
+
+  console.log("expenses loaded:", cacheExpenses.length, "sample:", cacheExpenses[0]);
+
   renderExpenses(cacheExpenses);
   msg("empExpMsg", "");
 }
@@ -152,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     msg("empWhMsg", m ? `Showing ${m}` : "");
   });
 
-  // Vacation: Save
+  // Vacation: Save (409 expected if already exists)
   document.getElementById("empVacSave")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     const type = document.getElementById("empVacType")?.value;
@@ -162,8 +183,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    await apiPost("/api/vacations", { vac_date, type });
-    msg("empVacMsg", "Vacation saved ✅");
+    try {
+      await apiPost("/api/vacations", { vac_date, type });
+      msg("empVacMsg", "Vacation saved ✅");
+    } catch (e) {
+      if (e?.status === 409) msg("empVacMsg", "Already exists for this date. Remove first.");
+      else msg("empVacMsg", e?.message || "Error");
+      return;
+    }
+
     await loadVacations();
   });
 
@@ -189,7 +217,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     msg("empVacMsg", m ? `Showing ${m}` : "");
   });
 
-  // Expenses: Add
+  // Expense: Add
   document.getElementById("empExpAdd")?.addEventListener("click", async () => {
     const expense_date = document.getElementById("empExpDate")?.value;
     const amount = document.getElementById("empExpAmount")?.value;
@@ -209,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("empExpLoad")?.addEventListener("click", async () => {
     await loadExpenses();
     const m = document.getElementById("empExpMonth")?.value;
-    const filtered = filterByMonth(cacheExpenses, (r) => r.expense_date, m);
+    const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);
     renderExpenses(filtered);
     msg("empExpMsg", m ? `Showing ${m}` : "");
   });

@@ -6,7 +6,7 @@ const { requireAuth, requireManager } = require("./welcome");
 const router = express.Router();
 
 function getUserId(req) {
-  return req?.user?.id ?? req?.user?.uid;
+  return req?.user?.id ?? req?.user?.uid ?? req?.user?.user_id ?? null;
 }
 
 // POST /api/work-hours  (employee adds own)
@@ -20,6 +20,9 @@ router.post("/work-hours", requireAuth, async (req, res) => {
     }
 
     const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
+    }
 
     const inserted = await query(
       `INSERT INTO work_hours (user_id, work_date, start_time, end_time)
@@ -84,6 +87,7 @@ router.post("/work-hours/manager", requireAuth, requireManager, async (req, res)
 router.get("/work-hours", requireAuth, async (req, res) => {
   try {
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
 
     const result = await query(
       `SELECT id, user_id, work_date, start_time, end_time, created_at

@@ -6,7 +6,7 @@ const { requireAuth, requireManager } = require("./welcome");
 const router = express.Router();
 
 function getUserId(req) {
-  return req?.user?.id ?? req?.user?.uid;
+  return req?.user?.id ?? req?.user?.uid ?? req?.user?.user_id ?? null;
 }
 
 // Try SQL with vacation_date first; if DB uses vac_date, fallback.
@@ -54,6 +54,7 @@ router.post("/vacations", requireAuth, async (req, res) => {
     }
 
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
 
     const exists = await vacationExists(userId, date);
     if (exists.exists) {
@@ -87,6 +88,7 @@ router.delete("/vacations", requireAuth, async (req, res) => {
     if (!date) return res.status(400).json({ error: "date (vacation_date/vac_date) is required" });
 
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
 
     await runWithDateColumn(
       `DELETE FROM vacations WHERE user_id = $1 AND vacation_date = $2`,
@@ -163,6 +165,7 @@ router.delete("/vacations/manager", requireAuth, requireManager, async (req, res
 router.get("/vacations", requireAuth, async (req, res) => {
   try {
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: "Unauthorized (missing user id in token)" });
 
     const r = await runWithDateColumn(
       `SELECT * FROM vacations WHERE user_id = $1 ORDER BY vacation_date DESC, id DESC`,

@@ -262,5 +262,5 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("mgrExport")?.addEventListener("click", doExport);
 
-  await loadUsers(auth.username);
+  // await loadUsers(auth.username);
 });

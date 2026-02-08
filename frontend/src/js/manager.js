@@ -261,6 +261,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     ?.addEventListener("click", removeVacation);
 
   document.getElementById("mgrExport")?.addEventListener("click", doExport);
-
-  // await loadUsers(auth.username);
 });

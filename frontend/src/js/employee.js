@@ -68,7 +68,7 @@ function renderWorkHours(rows) {
 }
 
 async function loadWorkHours() {
-  msg("empWhMsg", "טוען...");
+  msg("empWhMsg", "Loading...");
   const res = await apiGet("/api/work-hours");
   cacheWorkHours = res.workHours || [];
   renderWorkHours(cacheWorkHours);
@@ -97,7 +97,7 @@ function renderVacations(rows) {
 }
 
 async function loadVacations() {
-  msg("empVacMsg", "טוען...");
+  msg("empVacMsg", "Loading...");
   const res = await apiGet("/api/vacations");
   cacheVacations = res.vacations || [];
   renderVacations(cacheVacations);
@@ -112,6 +112,40 @@ function getExpenseDate(ex) {
   return isoToYmd(ex.expense_date || ex.date);
 }
 
+function wireExpenseDeleteButtons() {
+  const tbody = document.querySelector("#empExpTable tbody");
+  if (!tbody) return;
+
+  tbody.querySelectorAll("button[data-exp-del-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idRaw = btn.getAttribute("data-exp-del-id");
+      const id = Number(idRaw);
+      if (!Number.isFinite(id)) return;
+
+      const ok = confirm("להסיר את ההוצאה הזו?");
+      if (!ok) return;
+
+      btn.disabled = true;
+      try {
+        await apiDelete(`/api/expenses/${id}`);
+        msg("empExpMsg", "ההוצאה הוסרה ✅");
+
+        // refresh only if list is currently visible (user pressed Load)
+        if (expensesVisible) {
+          await loadExpenses();
+          const m = document.getElementById("empExpMonth")?.value;
+          const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);
+          renderExpenses(filtered);
+          msg("empExpMsg", m ? `מציג ${m}` : "");
+        }
+      } catch (e) {
+        btn.disabled = false;
+        msg("empExpMsg", e?.message || "שגיאה");
+      }
+    });
+  });
+}
+
 function renderExpenses(rows) {
   const tbody = ensureTbody("empExpTable");
   if (!tbody) return;
@@ -124,13 +158,20 @@ function renderExpenses(rows) {
       <td>${getExpenseDate(ex)}</td>
       <td>${ex.description ?? ""}</td>
       <td>${ex.amount ?? ""}</td>
+      <td>
+        <button class="btn btn-outline" type="button" data-exp-del-id="${ex.id}">
+          הסרה
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
+
+  wireExpenseDeleteButtons();
 }
 
 async function loadExpenses() {
-  msg("empExpMsg", "טוען...");
+  msg("empExpMsg", "Loading...");
   const res = await apiGet("/api/expenses");
   cacheExpenses = res.expenses || [];
   renderExpenses(cacheExpenses);
@@ -143,7 +184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!auth) return;
 
   const who = document.getElementById("whoami");
-  if (who) who.textContent = `מחובר כ־${auth.username}`;
+  if (who) who.textContent = `Logged in as ${auth.username}`;
 
   wireLogout();
 
@@ -154,12 +195,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const end_time = document.getElementById("empWhEnd")?.value;
 
     if (!work_date || !start_time || !end_time) {
-      msg("empWhMsg", "יש למלא את כל השדות");
+      msg("empWhMsg", "All fields required");
       return;
     }
 
     await apiPost("/api/work-hours", { work_date, start_time, end_time });
-    msg("empWhMsg", "נשמר ✅");
+    msg("empWhMsg", "Saved ✅");
     await loadWorkHours();
   });
 
@@ -169,7 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const m = document.getElementById("empWhMonth")?.value;
     const filtered = filterByMonth(cacheWorkHours, (r) => r.work_date, m);
     renderWorkHours(filtered);
-    msg("empWhMsg", m ? `מציג ${m}` : "");
+    msg("empWhMsg", m ? `Showing ${m}` : "");
   });
 
   // Vacation: Save (NO auto-load list unless it is currently visible)
@@ -178,16 +219,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const type = document.getElementById("empVacType")?.value;
 
     if (!vac_date || !type) {
-      msg("empVacMsg", "יש להזין תאריך וסוג");
+      msg("empVacMsg", "Date + type required");
       return;
     }
 
     try {
       await apiPost("/api/vacations", { vac_date, type });
-      msg("empVacMsg", "החופשה נשמרה ✅");
+      msg("empVacMsg", "Vacation saved ✅");
     } catch (e) {
-      if (e?.status === 409) msg("empVacMsg", "כבר קיימת חופשה בתאריך הזה. יש להסיר קודם.");
-      else msg("empVacMsg", e?.message || "שגיאה");
+      if (e?.status === 409) msg("empVacMsg", "Already exists for this date. Remove first.");
+      else msg("empVacMsg", e?.message || "Error");
       return;
     }
 
@@ -197,7 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const m = document.getElementById("empVacMonth")?.value;
       const filtered = filterByMonth(cacheVacations, getVacationDate, m);
       renderVacations(filtered);
-      msg("empVacMsg", m ? `מציג ${m}` : "");
+      msg("empVacMsg", m ? `Showing ${m}` : "");
     }
   });
 
@@ -205,12 +246,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("empVacDelete")?.addEventListener("click", async () => {
     const vac_date = document.getElementById("empVacDate")?.value;
     if (!vac_date) {
-      msg("empVacMsg", "בחרו תאריך להסרה");
+      msg("empVacMsg", "Choose a date to remove");
       return;
     }
 
     await apiDelete("/api/vacations", { vac_date });
-    msg("empVacMsg", "החופשה הוסרה ✅");
+    msg("empVacMsg", "Vacation removed ✅");
 
     // ✅ Only refresh table if user pressed Load before
     if (vacationsVisible) {
@@ -218,7 +259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const m = document.getElementById("empVacMonth")?.value;
       const filtered = filterByMonth(cacheVacations, getVacationDate, m);
       renderVacations(filtered);
-      msg("empVacMsg", m ? `מציג ${m}` : "");
+      msg("empVacMsg", m ? `Showing ${m}` : "");
     }
   });
 
@@ -229,7 +270,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const m = document.getElementById("empVacMonth")?.value;
     const filtered = filterByMonth(cacheVacations, getVacationDate, m);
     renderVacations(filtered);
-    msg("empVacMsg", m ? `מציג ${m}` : "");
+    msg("empVacMsg", m ? `Showing ${m}` : "");
   });
 
   // Expense: Add (NO auto-load list unless it is currently visible)
@@ -239,12 +280,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const description = document.getElementById("empExpDesc")?.value?.trim();
 
     if (!expense_date || !description || amount === "" || amount === null) {
-      msg("empExpMsg", "יש להזין תאריך, סכום ותיאור");
+      msg("empExpMsg", "Date + amount + description required");
       return;
     }
 
     await apiPost("/api/expenses", { expense_date, description, amount: Number(amount) });
-    msg("empExpMsg", "ההוצאה נשמרה ✅");
+    msg("empExpMsg", "Expense saved ✅");
 
     // ✅ Only refresh table if user pressed Load before
     if (expensesVisible) {
@@ -252,7 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const m = document.getElementById("empExpMonth")?.value;
       const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);
       renderExpenses(filtered);
-      msg("empExpMsg", m ? `מציג ${m}` : "");
+      msg("empExpMsg", m ? `Showing ${m}` : "");
     }
   });
 
@@ -263,6 +304,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const m = document.getElementById("empExpMonth")?.value;
     const filtered = filterByMonth(cacheExpenses, getExpenseDate, m);
     renderExpenses(filtered);
-    msg("empExpMsg", m ? `מציג ${m}` : "");
+    msg("empExpMsg", m ? `Showing ${m}` : "");
   });
 });

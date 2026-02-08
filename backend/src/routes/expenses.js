@@ -5,31 +5,8 @@ const { requireAuth, requireManager } = require("./welcome");
 
 const router = express.Router();
 
-/**
- * DB schema (your actual DB):
- *   expenses(username text NOT NULL, expense_date date, amount numeric, description text, created_at)
- *   FK: expenses.username -> users.username
- *
- * So we use username everywhere.
- * For safety, if someone sends user_id (legacy), we try to resolve id -> username.
- */
-
 function getUsernameFromToken(req) {
   return req?.user?.username ?? null;
-}
-
-async function resolveUsernameFromBody(body) {
-  const username = body?.username?.trim();
-  if (username) return username;
-
-  const user_id = body?.user_id ?? body?.uid ?? body?.id;
-  if (user_id === undefined || user_id === null || user_id === "") return null;
-
-  const n = Number(user_id);
-  if (!Number.isFinite(n)) return null;
-
-  const r = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1`, [n]);
-  return r.rows[0]?.username ?? null;
 }
 
 // POST /api/expenses (employee: own)
@@ -67,7 +44,9 @@ router.post("/expenses", requireAuth, async (req, res) => {
 router.get("/expenses", requireAuth, async (req, res) => {
   try {
     const username = getUsernameFromToken(req);
-    if (!username) return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    }
 
     const { rows } = await query(
       `SELECT *
@@ -84,8 +63,39 @@ router.get("/expenses", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/expenses/:id (employee: own)
+// Deletes only if the expense belongs to the logged-in user.
+router.delete("/expenses/:id", requireAuth, async (req, res) => {
+  try {
+    const username = getUsernameFromToken(req);
+    if (!username) {
+      return res.status(401).json({ error: "Unauthorized (missing username in token)" });
+    }
+
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "Invalid expense id" });
+    }
+
+    const { rows } = await query(
+      `DELETE FROM expenses
+       WHERE id = $1 AND username = $2
+       RETURNING id`,
+      [id, username]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+
+    return res.json({ ok: true, deleted_id: rows[0].id });
+  } catch (err) {
+    console.error("expenses delete error:", err);
+    return res.status(500).json({ error: "Server error", details: String(err.message || err) });
+  }
+});
+
 // GET /api/expenses/all (manager)
-// LEFT JOIN to still work if there are old bad rows (e.g., username NULL in legacy data)
 router.get("/expenses/all", requireAuth, requireManager, async (req, res) => {
   try {
     const { rows } = await query(
